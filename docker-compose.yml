@@ -1,0 +1,43 @@
+# Services de développement pour Griotoon.
+# Le frontend et le backend tournent en local (npm run dev / uvicorn) pendant le dev.
+# Des services frontend, backend et worker pourront être ajoutés ici plus tard.
+
+services:
+  postgres:
+    image: postgres:16
+    container_name: griotoon-postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-griotoon}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-griotoon}
+      POSTGRES_DB: ${POSTGRES_DB:-griotoon}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-griotoon}"]
+      interval: 5s
+      retries: 10
+
+  redis:
+    image: redis:7
+    container_name: griotoon-redis
+    ports:
+      - "6379:6379"
+
+  minio:
+    image: minio/minio
+    container_name: griotoon-minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-griotoon}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-griotoon-secret}
+    ports:
+      - "9000:9000"   # API S3
+      - "9001:9001"   # console web
+    volumes:
+      - miniodata:/data
+
+volumes:
+  pgdata:
+  miniodata:

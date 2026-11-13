@@ -1,0 +1,20 @@
+# Secrets
+.env
+
+# Node / Next.js
+node_modules/
+.next/
+out/
+*.tsbuildinfo
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+.pytest_cache/
+
+# Divers
+.DS_Store
+*.log
+exports/
