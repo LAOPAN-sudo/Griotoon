@@ -28,7 +28,7 @@ Ne change pas de stack sans le proposer d'abord et sans ajouter une entrée dans
 ## Règles de travail
 
 1. **Respecte la phase en cours.** Ne code pas les phases suivantes en avance. Prévois juste des points d'extension propres (par exemple un champ `image` dans une case, qui servira plus tard à l'IA).
-2. **Interface 100 % en français.** Libellés, messages d'erreur, textes d'aide. Le code (variables, fonctions, commentaires techniques) reste en anglais.
+2. **Interface bilingue : français ou anglais.** Le français est la langue par défaut, et l'utilisateur peut passer à l'anglais. Aucun texte d'interface (libellés, messages d'erreur, textes d'aide) n'est écrit en dur dans les composants : tout passe par les dictionnaires de traduction (`src/i18n/fr.ts` et `src/i18n/en.ts`). Toute nouvelle clé est ajoutée dans les deux langues. Le code (variables, fonctions, commentaires techniques) reste en anglais.
 3. **Le texte des bulles n'est jamais généré dans l'image.** Les bulles sont des objets vectoriels de l'éditeur : toujours lisibles, modifiables, traduisibles.
 4. **Une page est un document JSON** (format dans `docs/04-modele-donnees.md`). Le canvas n'est qu'un rendu de ce JSON. Toute modification passe par le store, jamais par une mutation directe des objets Konva.
 5. **Connexion faible** : images compressées (WebP), chargement progressif, sauvegarde locale (IndexedDB) avant synchronisation.

@@ -11,3 +11,4 @@ Format : date · décision · raison. Ajoute une entrée pour tout choix structu
 | 5 | 2026-11-13 | Back : FastAPI + PostgreSQL + Redis/Celery + MinIO | Python, c'est le terrain du porteur du projet. Générations asynchrones. Stockage compatible S3. |
 | 6 | 2026-11-13 | Le texte des bulles n'est jamais généré dans l'image | Lisibilité, édition, traduction. Les modèles image gèrent mal le texte. |
 | 7 | 2026-11-13 | Phase 1 = éditeur sans IA | C'est le cœur de la différenciation, et il ne coûte rien en API. |
+| 8 | 2026-11-13 | Interface **bilingue français / anglais** dès la phase 1, français par défaut | Ouvre l'outil aux créateurs anglophones (Nigeria, Ghana…) sans perdre le public francophone. Mise en place : dictionnaires typés `fr` / `en` et un hook `useT()`, sans bibliothèque ni changement d'URL. La langue choisie est mémorisée localement. À revoir (par exemple avec next-intl) si on ajoute d'autres langues ou des URL par langue. |

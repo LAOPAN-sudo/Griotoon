@@ -28,6 +28,8 @@
   - actions : `addPanel`, `updatePanel`, `removeElement`, `addBubble`, `updateBubble`, `addSfx`, `applyTemplate`, `reorder`, `select`
   - historique : piles `past` et `future` (limite de 100), `undo()` et `redo()`. Utiliser `immer` ou des copies immuables.
 - Tests Vitest du store : ajout, modification, annuler, rétablir.
+- Traductions : `src/i18n/fr.ts` (référence) et `src/i18n/en.ts`, typé pour que TypeScript signale toute clé manquante en anglais. Un hook `useT()` renvoie le texte dans la langue courante, et un sélecteur **FR / EN** est placé dans la barre du haut. La langue choisie est mémorisée dans `localStorage`, avec le français par défaut.
+- Test Vitest : les dictionnaires `fr` et `en` ont exactement les mêmes clés.
 
 ### Étape 2 : canvas
 - `Stage` react-konva qui remplit la zone centrale. La page est un `Rect` blanc avec une ombre.

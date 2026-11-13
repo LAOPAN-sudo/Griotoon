@@ -3,7 +3,7 @@
 ## Par pilier
 
 ### Pilier 1 : public francophone et africain
-- Interface entièrement en français (i18n prévue pour l'anglais, puis le mooré, le dioula, le wolof…).
+- Interface en **français ou en anglais**, au choix de l'utilisateur (français par défaut). D'autres langues pourront suivre : mooré, dioula, wolof…
 - Bibliothèque de **styles visuels** : manga noir et blanc, manhua couleur, webtoon, plus des styles « afro » (couleurs chaudes, motifs inspirés du bogolan et du wax…).
 - **Décors et références** : village sahélien, marché, maquis, ville (Ouaga, Abidjan, Dakar), savane, cour familiale…
 - **Modèles d'histoires** : conte traditionnel, légende, vie de quartier, histoire d'école, sensibilisation (santé, environnement).

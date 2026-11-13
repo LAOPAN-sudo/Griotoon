@@ -8,6 +8,7 @@ Coche les cases au fur et à mesure (`[x]`).
 Objectif : un éditeur utilisable pour monter une planche avec ses propres images. Spec détaillée dans `06-spec-editeur.md`.
 
 - [ ] Initialiser le front (Next.js, TypeScript, Tailwind, react-konva, Zustand, Vitest)
+- [ ] Interface bilingue français / anglais : dictionnaires `fr` et `en`, sélecteur de langue, choix mémorisé (français par défaut)
 - [ ] Types `Page`, `Panel`, `Bubble`, `Sfx` + store Zustand avec annuler/rétablir
 - [ ] Canvas : affichage d'une page A4 à l'échelle, zoom et déplacement de la vue
 - [ ] Gabarits de découpage (au moins 6) appliqués à une page vide
