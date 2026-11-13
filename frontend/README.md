@@ -1,25 +1,39 @@
 # Frontend Griotoon (Next.js)
 
-Ce dossier est vide pour l'instant. À initialiser par Claude Code au début de la phase 1.
+Éditeur de planches de Griotoon : Next.js (App Router) + TypeScript + Tailwind CSS, canvas avec `react-konva`, état avec Zustand.
 
-## Initialisation
-
-Depuis la racine du projet :
+## Commandes
 
 ```bash
-npx create-next-app@latest frontend --typescript --tailwind --eslint --app --src-dir --import-alias "@/*"
-cd frontend
-npm install konva react-konva zustand immer idb-keyval jspdf nanoid
-npm install -D vitest @testing-library/react @testing-library/jest-dom jsdom
+npm install          # première fois
+npm run dev          # http://localhost:3000
+npm test             # tests Vitest (une passe)
+npm run test:watch   # tests en continu
+npm run typecheck    # vérification TypeScript
+npm run lint         # ESLint
+npm run build        # build de production
 ```
 
-> ⚠️ `create-next-app` refuse un dossier non vide : déplace temporairement ce README, puis remets-le (ou fusionne son contenu dans le README généré).
+## Organisation
 
-Notes :
-- react-konva utilise le canvas du navigateur, donc les composants de l'éditeur sont des **composants client** (`'use client'`), chargés via `next/dynamic` avec `{ ssr: false }`.
-- Ajoute un script `"test": "vitest"` dans `package.json`.
-- Polices : Comic Neue (bulles) et Bangers (onomatopées), via `next/font/google`.
+```
+src/
+├── app/                 # routes Next.js (App Router)
+├── components/
+│   ├── LocaleSync.tsx   # restaure la langue choisie, met à jour <html lang>
+│   └── ui/              # boutons, sélecteur de langue…
+├── i18n/                # traductions : fr.ts (référence), en.ts, useT()
+├── lib/page.ts          # page vide et éléments par défaut (case, bulle, onomatopée)
+├── store/editorStore.ts # store Zustand de l'éditeur + annuler/rétablir
+└── types/page.ts        # format JSON d'une page (docs/04-modele-donnees.md)
+```
 
-## Organisation cible
+Organisation cible complète : `../docs/03-architecture.md`.
 
-Voir `../docs/03-architecture.md` (section Frontend) et `../docs/06-spec-editeur.md`.
+## Règles
+
+- **Traductions** : aucun texte d'interface en dur dans les composants. On ajoute la clé dans `src/i18n/fr.ts` **et** dans `src/i18n/en.ts` (sinon TypeScript refuse de compiler), puis on l'utilise avec `const t = useT(); t("ma.cle")`. Paramètres : `t("home.phase", { phase: 1 })` pour `"Phase {phase}"`.
+- **Store** : toute modification de la page passe par les actions de `editorStore` (jamais de mutation directe des objets Konva). Chaque action crée une étape d'historique ; la sélection n'en crée pas.
+- **Canvas** : react-konva utilise le canvas du navigateur. Les composants de l'éditeur sont des composants client (`'use client'`) chargés via `next/dynamic` avec `{ ssr: false }`.
+- **Polices** : Geist (interface), Comic Neue (bulles, classe `font-comic`), Bangers (onomatopées, classe `font-bangers`), chargées via `next/font/google` dans `src/app/layout.tsx`.
+- Cette version de Next.js (16) diffère des anciennes : consulter `node_modules/next/dist/docs/` en cas de doute (voir `AGENTS.md`).
