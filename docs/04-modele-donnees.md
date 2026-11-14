@@ -98,9 +98,10 @@ Coordonnées en **pixels de la page** (origine en haut à gauche). Le canvas met
       "rotation": 0,
       "border": { "width": 4, "color": "#000000" },
       "image": {                         // null si la case est vide
-        "src": "https://…/img.webp",
-        "offsetX": 0, "offsetY": 0,      // recadrage dans la case
-        "scale": 1
+        "src": "https://…/img.webp",     // phase 1 : dataURL WebP ; phase 2 : URL MinIO
+        "width": 1600, "height": 1200,   // taille réelle de l'image stockée, en pixels
+        "offsetX": 0, "offsetY": 0,      // recadrage : position du coin haut gauche de l'image dans la case
+        "scale": 1                       // taille affichée = width × scale, height × scale
       },
       "characters": ["char_uuid_1"],     // utilisé par la génération IA (phases 3 et 4)
       "description": "Plan large : Awa arrive au marché de Ouaga au lever du soleil",
@@ -134,7 +135,10 @@ Coordonnées en **pixels de la page** (origine en haut à gauche). Le canvas met
 ```ts
 export type BubbleType = 'speech' | 'thought' | 'shout' | 'narration';
 
-export interface PanelImage { src: string; offsetX: number; offsetY: number; scale: number; }
+export interface PanelImage {
+  src: string; width: number; height: number;   // taille réelle de l'image stockée
+  offsetX: number; offsetY: number; scale: number;
+}
 export interface Panel {
   id: string; x: number; y: number; w: number; h: number; rotation: number;
   border: { width: number; color: string };

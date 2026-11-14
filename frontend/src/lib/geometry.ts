@@ -47,3 +47,24 @@ export function rectFromPoints(
     h: Math.abs(b.y - a.y),
   };
 }
+
+/** Convert a page point into a panel's local coordinates (undoing its rotation). */
+export function toLocal(r: Rotatable, point: { x: number; y: number }): { x: number; y: number } {
+  const a = (-r.rotation * Math.PI) / 180;
+  const dx = point.x - r.x;
+  const dy = point.y - r.y;
+  return { x: dx * Math.cos(a) - dy * Math.sin(a), y: dx * Math.sin(a) + dy * Math.cos(a) };
+}
+
+export function containsPoint(r: Rotatable, point: { x: number; y: number }): boolean {
+  const local = toLocal(r, point);
+  return local.x >= 0 && local.x <= r.w && local.y >= 0 && local.y <= r.h;
+}
+
+/** Topmost element (highest z) containing the point, if any. */
+export function topmostAt<T extends Rotatable & { z: number }>(
+  items: T[],
+  point: { x: number; y: number },
+): T | undefined {
+  return [...items].sort((a, b) => b.z - a.z).find((item) => containsPoint(item, point));
+}

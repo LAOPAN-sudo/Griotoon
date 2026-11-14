@@ -284,3 +284,79 @@ describe("batch updates, nudge and duplicate", () => {
     expect(s().past).toHaveLength(0);
   });
 });
+
+describe("panel images and crop sessions", () => {
+  const image = { src: "data:image/webp;base64,AAAA", width: 800, height: 600, offsetX: 0, offsetY: 0, scale: 1 };
+
+  it("puts an image in a panel and selects it, in one undo step", () => {
+    const p = s().addPanel();
+    s().select(null);
+    s().setPanelImage(p, image);
+    expect(s().page.panels[0].image).toEqual(image);
+    expect(s().selectedIds).toEqual([p]);
+    s().undo();
+    expect(s().page.panels[0].image).toBeNull();
+  });
+
+  it("ignores unknown panels", () => {
+    s().setPanelImage("nope", image);
+    expect(s().past).toHaveLength(0);
+  });
+
+  it("saves a whole crop session as one undo step", () => {
+    const p = s().addPanel();
+    s().setPanelImage(p, image);
+    const steps = s().past.length;
+
+    s().startCrop(p);
+    expect(s().crop?.panelId).toBe(p);
+    s().updateCrop({ ...image, offsetX: -10 });
+    s().updateCrop({ ...image, offsetX: -20, scale: 1.5 });
+    // Nothing saved yet: the page still has the original crop.
+    expect(s().page.panels[0].image?.offsetX).toBe(0);
+
+    s().endCrop();
+    expect(s().crop).toBeNull();
+    expect(s().page.panels[0].image).toMatchObject({ offsetX: -20, scale: 1.5 });
+    expect(s().past.length).toBe(steps + 1);
+    s().undo();
+    expect(s().page.panels[0].image?.offsetX).toBe(0);
+  });
+
+  it("discards the session on undo, and adds no step when nothing changed", () => {
+    const p = s().addPanel();
+    s().setPanelImage(p, image);
+    const steps = s().past.length;
+    s().startCrop(p);
+    s().updateCrop({ ...image, offsetX: -50 });
+    s().undo(); // cancels the session only
+    expect(s().crop).toBeNull();
+    expect(s().page.panels[0].image?.offsetX).toBe(0);
+    expect(s().page.panels[0].image).not.toBeNull();
+
+    s().startCrop(p);
+    s().endCrop();
+    expect(s().past.length).toBe(steps);
+  });
+
+  it("does not crop a panel without image", () => {
+    const p = s().addPanel();
+    s().startCrop(p);
+    expect(s().crop).toBeNull();
+  });
+
+  it("ends the session when switching tool or deleting the panel", () => {
+    const p = s().addPanel();
+    s().setPanelImage(p, image);
+    s().startCrop(p);
+    s().updateCrop({ ...image, offsetY: -5 });
+    s().setTool("panel");
+    expect(s().crop).toBeNull();
+    expect(s().page.panels[0].image?.offsetY).toBe(-5);
+
+    s().startCrop(p);
+    s().removeElement(p);
+    expect(s().crop).toBeNull();
+    expect(s().page.panels).toHaveLength(0);
+  });
+});

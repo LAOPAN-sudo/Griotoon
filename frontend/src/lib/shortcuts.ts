@@ -102,6 +102,7 @@ export const SHORTCUT_GROUPS: ShortcutGroup[] = [
     items: [
       { combos: [["keys.click"]], descriptionKey: "shortcuts.select" },
       { combos: [["keys.shift", "keys.click"]], descriptionKey: "shortcuts.selectAdd" },
+      { combos: [["keys.doubleClick"]], descriptionKey: "shortcuts.panelImage" },
       { combos: [["keys.delete"], ["keys.backspace"]], descriptionKey: "shortcuts.delete" },
       { combos: [["keys.ctrl", "D"]], descriptionKey: "shortcuts.duplicate" },
       { combos: [["keys.arrows"]], descriptionKey: "shortcuts.nudge" },

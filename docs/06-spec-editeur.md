@@ -55,10 +55,10 @@ Le choix d'un gabarit remplace les cases existantes après confirmation (« Remp
 - Touche Suppr pour supprimer, Ctrl+Z / Ctrl+Y pour annuler et rétablir, Ctrl+D pour dupliquer.
 
 ### Étape 5 : images dans les cases
-- Glisser-déposer un fichier image sur une case, ou bouton « Importer une image » dans les propriétés.
+- Glisser-déposer un fichier image sur une case, ou bouton « Importer une image » dans les propriétés. En attendant le panneau des propriétés (étape 8) : bouton **Image** dans la colonne d'outils (case sélectionnée) et double-clic sur une case vide.
 - Image **découpée** à la forme de la case (`clipFunc` ou `Group` avec `clip`).
 - Double-clic sur la case : mode recadrage (déplacer et zoomer l'image dans la case), puis Échap pour sortir.
-- Phase 1 : image stockée en `dataURL` ou dans IndexedDB (blob). Phase 2 : téléversement sur MinIO.
+- Phase 1 : image stockée en `dataURL` dans le JSON de la page (décision n° 9). Phase 2 : téléversement sur MinIO.
 - Compression côté client en WebP, avec un côté maximal de 2000 px.
 
 ### Étape 6 : bulles

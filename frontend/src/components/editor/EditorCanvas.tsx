@@ -7,15 +7,19 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type Konva from "konva";
-import { Layer, Line, Rect, Stage, Transformer } from "react-konva";
+import { Group, Image as KonvaImage, Layer, Line, Rect, Stage, Transformer } from "react-konva";
 import { useEditorStore } from "@/store/editorStore";
 import { useViewStore } from "@/store/viewStore";
+import { useUiStore } from "@/store/uiStore";
 import { wheelDeltaPixels, wheelZoomFactor } from "@/lib/viewport";
-import { boundsOf, rectFromPoints, type Box } from "@/lib/geometry";
+import { boundsOf, rectFromPoints, toLocal, topmostAt, type Box } from "@/lib/geometry";
 import { buildSnapTargets, snapBox, snapPoint, SNAP_TOLERANCE_PX, type Guides } from "@/lib/snapping";
+import { clampCrop, zoomCrop } from "@/lib/image";
 import { useT } from "@/i18n";
 import type { Panel } from "@/types/page";
 import { useSpaceKey } from "./useSpaceKey";
+import { PanelNode, useImageElement } from "./PanelNode";
+import { importImageIntoPanel, openImagePicker } from "./imageImport";
 
 /** Smallest panel size, in page pixels. */
 const MIN_PANEL_SIZE = 40;
@@ -38,6 +42,7 @@ export default function EditorCanvas() {
   const page = useEditorStore((s) => s.page);
   const selectedIds = useEditorStore((s) => s.selectedIds);
   const tool = useEditorStore((s) => s.tool);
+  const crop = useEditorStore((s) => s.crop);
   const view = useViewStore((s) => s.view);
   const viewport = useViewStore((s) => s.viewport);
   const spacePressed = useSpaceKey();
@@ -45,6 +50,8 @@ export default function EditorCanvas() {
   const [isPanning, setIsPanning] = useState(false);
   const [guides, setGuides] = useState<Guides>({});
   const [draft, setDraft] = useState<{ start: Point; end: Point } | null>(null);
+  /** Panel under a file being dragged from the computer. */
+  const [dropTargetId, setDropTargetId] = useState<string | null>(null);
 
   const pageSize = useMemo(
     () => ({ width: page.width, height: page.height }),
@@ -77,8 +84,19 @@ export default function EditorCanvas() {
       e.preventDefault();
       const store = useViewStore.getState();
       const delta = wheelDeltaPixels(e, el.clientHeight);
+      const rect = el.getBoundingClientRect();
+      const { crop, page, updateCrop } = useEditorStore.getState();
+      if (crop && !(e.ctrlKey || e.metaKey)) {
+        // While cropping, the wheel zooms the image around the cursor.
+        const panel = page.panels.find((p) => p.id === crop.panelId);
+        if (!panel) return;
+        const v = store.view;
+        const pagePoint = { x: (e.clientX - rect.left - v.x) / v.scale, y: (e.clientY - rect.top - v.y) / v.scale };
+        const anchor = toLocal(panel, pagePoint);
+        updateCrop(zoomCrop(panel.w, panel.h, crop.image, crop.image.scale * wheelZoomFactor(delta.y), anchor));
+        return;
+      }
       if (e.ctrlKey || e.metaKey) {
-        const rect = el.getBoundingClientRect();
         const anchor = { x: e.clientX - rect.left, y: e.clientY - rect.top };
         store.zoomTo(store.view.scale * wheelZoomFactor(delta.y), anchor);
       } else if (e.shiftKey && delta.x === 0) {
@@ -111,14 +129,14 @@ export default function EditorCanvas() {
     const transformer = transformerRef.current;
     const stage = stageRef.current;
     if (!transformer || !stage) return;
-    const nodes = selectedPanelIds
+    const nodes = (crop ? [] : selectedPanelIds)
       .map((id) => stage.findOne(`#${id}`))
       .filter((n): n is Konva.Node => !!n);
     transformer.nodes(nodes);
     transformer.getLayer()?.batchDraw();
-  }, [selectedPanelIds, page.panels]);
+  }, [selectedPanelIds, page.panels, crop]);
 
-  const canEdit = tool === "select" && !spacePressed;
+  const canEdit = tool === "select" && !spacePressed && !crop;
 
   // ---------------------------------------------------------------- snapping
 
@@ -183,30 +201,31 @@ export default function EditorCanvas() {
     useEditorStore.getState().updateElements(patches);
   };
 
-  /** Bake the Transformer's scale into width/height, then commit. */
+  /**
+   * Bake the Transformer's scale into w/h, then commit. The image keeps its
+   * crop but is refitted if needed so it still covers the resized panel.
+   */
   const onTransformEnd = () => {
     setGuides({});
+    const { page, updateElements } = useEditorStore.getState();
     const nodes = transformerRef.current?.nodes() ?? [];
-    const patches = nodes.map((node) => {
+    const patches = nodes.flatMap((node) => {
+      const panel = page.panels.find((p) => p.id === node.id());
+      if (!panel) return [];
+      const w = px(Math.max(MIN_PANEL_SIZE, panel.w * node.scaleX()));
+      const h = px(Math.max(MIN_PANEL_SIZE, panel.h * node.scaleY()));
       const patch = {
         x: px(node.x()),
         y: px(node.y()),
-        w: px(Math.max(MIN_PANEL_SIZE, node.width() * node.scaleX())),
-        h: px(Math.max(MIN_PANEL_SIZE, node.height() * node.scaleY())),
+        w,
+        h,
         rotation: deg(node.rotation()),
+        image: panel.image ? clampCrop(w, h, panel.image) : null,
       };
-      node.setAttrs({
-        x: patch.x,
-        y: patch.y,
-        width: patch.w,
-        height: patch.h,
-        rotation: patch.rotation,
-        scaleX: 1,
-        scaleY: 1,
-      });
-      return { id: node.id(), patch };
+      node.setAttrs({ x: patch.x, y: patch.y, rotation: patch.rotation, scaleX: 1, scaleY: 1 });
+      return [{ id: panel.id, patch }];
     });
-    useEditorStore.getState().updateElements(patches);
+    updateElements(patches);
   };
 
   /** Snap the dragged resize handle (unrotated panels only). */
@@ -224,6 +243,10 @@ export default function EditorCanvas() {
 
   const onStagePointerDown = (e: Konva.KonvaEventObject<PointerEvent>) => {
     if (spacePressed) return;
+    // A click anywhere but on the image being cropped ends the crop session.
+    if (useEditorStore.getState().crop && e.target.name() !== "cropImage") {
+      useEditorStore.getState().endCrop();
+    }
     if (tool === "panel") {
       const p = pointerOnPage();
       if (!p) return;
@@ -273,6 +296,62 @@ export default function EditorCanvas() {
 
   const draftRect = draft ? rectFromPoints(draft.start, draft.end) : null;
 
+  // ------------------------------------------------------------------ images
+
+  /** Double-click: crop the image, or pick one if the panel is empty. */
+  const onPanelDblClick = (panel: Panel) => {
+    if (tool !== "select" || spacePressed) return;
+    if (panel.image) useEditorStore.getState().startCrop(panel.id);
+    else openImagePicker(panel.id);
+  };
+
+  const cropPanel = crop ? page.panels.find((p) => p.id === crop.panelId) : undefined;
+  const cropElement = useImageElement(crop?.image.src);
+
+  /** Dragging the faded full image moves the crop, clamped so the panel stays covered. */
+  const onCropDragMove = (e: Konva.KonvaEventObject<DragEvent>) => {
+    const { crop, updateCrop } = useEditorStore.getState();
+    if (!crop || !cropPanel) return;
+    const next = clampCrop(cropPanel.w, cropPanel.h, {
+      ...crop.image,
+      offsetX: e.target.x(),
+      offsetY: e.target.y(),
+    });
+    e.target.position({ x: next.offsetX, y: next.offsetY });
+    updateCrop(next);
+  };
+
+  /** Page point under a browser drag event (file dragged from the computer). */
+  const pagePointOf = (e: React.DragEvent): Point => {
+    const rect = containerRef.current!.getBoundingClientRect();
+    return toPage({ x: e.clientX - rect.left, y: e.clientY - rect.top });
+  };
+  const isFileDrag = (e: React.DragEvent) => e.dataTransfer.types.includes("Files");
+
+  const onFileDragOver = (e: React.DragEvent) => {
+    if (!isFileDrag(e)) return;
+    e.preventDefault(); // allow dropping
+    e.dataTransfer.dropEffect = "copy";
+    const target = topmostAt(useEditorStore.getState().page.panels, pagePointOf(e));
+    setDropTargetId(target?.id ?? null);
+  };
+
+  const onFileDrop = (e: React.DragEvent) => {
+    if (!isFileDrag(e)) return;
+    e.preventDefault();
+    setDropTargetId(null);
+    const file = e.dataTransfer.files[0];
+    const target = topmostAt(useEditorStore.getState().page.panels, pagePointOf(e));
+    if (!file) return;
+    if (!target) {
+      useUiStore.getState().notify("error", "image.errorDropOutside");
+      return;
+    }
+    void importImageIntoPanel(file, target.id);
+  };
+
+  const dropTarget = dropTargetId ? page.panels.find((p) => p.id === dropTargetId) : undefined;
+
   // ------------------------------------------------------------------ render
 
   const cursor = isPanning
@@ -293,6 +372,12 @@ export default function EditorCanvas() {
       aria-label={t("editor.canvasLabel")}
       className="absolute inset-0 overflow-hidden"
       style={{ cursor }}
+      onDragOver={onFileDragOver}
+      onDragLeave={(e) => {
+        // Only when leaving the canvas, not when moving between its children.
+        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDropTargetId(null);
+      }}
+      onDrop={onFileDrop}
     >
       {viewport.width > 0 && viewport.height > 0 && (
         <Stage
@@ -330,23 +415,16 @@ export default function EditorCanvas() {
               listening={false}
             />
             {panels.map((panel) => (
-              <Rect
+              <PanelNode
                 key={panel.id}
-                id={panel.id}
-                name="panel"
-                x={panel.x}
-                y={panel.y}
-                width={panel.w}
-                height={panel.h}
-                rotation={panel.rotation}
-                stroke={panel.border.color}
-                strokeWidth={panel.border.width}
-                fill="#FFFFFF"
+                panel={panel}
+                image={crop?.panelId === panel.id ? crop.image : panel.image}
                 listening={tool === "select"}
                 draggable={canEdit}
                 dragBoundFunc={panelDragBound(panel)}
                 onPointerDown={(e) => onPanelPointerDown(panel, e)}
                 onDragEnd={onPanelDragEnd}
+                onDblClick={() => onPanelDblClick(panel)}
               />
             ))}
           </Layer>
@@ -355,6 +433,53 @@ export default function EditorCanvas() {
           <Layer name="bubblesLayer" />
 
           <Layer name="uiLayer">
+            {/* Crop session: the whole image, faded, can be dragged; the panel shows the result. */}
+            {crop && cropPanel && cropElement && (
+              <Group x={cropPanel.x} y={cropPanel.y} rotation={cropPanel.rotation}>
+                <KonvaImage
+                  name="cropImage"
+                  image={cropElement}
+                  x={crop.image.offsetX}
+                  y={crop.image.offsetY}
+                  width={crop.image.width * crop.image.scale}
+                  height={crop.image.height * crop.image.scale}
+                  opacity={0.35}
+                  draggable={!spacePressed}
+                  onDragMove={onCropDragMove}
+                  onMouseEnter={(e) => {
+                    const container = e.target.getStage()?.container();
+                    if (container) container.style.cursor = "move";
+                  }}
+                  onMouseLeave={(e) => {
+                    const container = e.target.getStage()?.container();
+                    if (container) container.style.cursor = "";
+                  }}
+                />
+                <Rect
+                  width={cropPanel.w}
+                  height={cropPanel.h}
+                  stroke={SELECTION_COLOR}
+                  strokeWidth={2}
+                  strokeScaleEnabled={false}
+                  dash={[6, 4]}
+                  listening={false}
+                />
+              </Group>
+            )}
+            {dropTarget && (
+              <Rect
+                x={dropTarget.x}
+                y={dropTarget.y}
+                width={dropTarget.w}
+                height={dropTarget.h}
+                rotation={dropTarget.rotation}
+                stroke={SELECTION_COLOR}
+                strokeWidth={4}
+                strokeScaleEnabled={false}
+                fill="rgba(37, 99, 235, 0.12)"
+                listening={false}
+              />
+            )}
             {draftRect && (
               <Rect
                 {...draftRect}
@@ -388,7 +513,7 @@ export default function EditorCanvas() {
             )}
             <Transformer
               ref={transformerRef}
-              visible={tool === "select"}
+              visible={tool === "select" && !crop}
               ignoreStroke
               flipEnabled={false}
               keepRatio={false}

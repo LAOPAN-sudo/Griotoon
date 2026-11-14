@@ -22,6 +22,21 @@ export const en: Messages = {
   "toolbar.templates": "Layout",
   "toolbar.select": "Select",
   "toolbar.panel": "Panel",
+  "toolbar.image": "Image",
+  "toolbar.imageTitle": "Import an image into the selected panel",
+  "toolbar.imageDisabled": "Select a panel to import an image into it",
+
+  "image.importing": "Importing the image…",
+  "image.errorNotImage": "This file is not a supported image (JPEG, PNG, WebP, GIF, AVIF).",
+  "image.errorTooLarge": "This image is too heavy (maximum {max} MB).",
+  "image.errorDecode": "This image can't be read. Try another file.",
+  "image.errorDropOutside": "Drop the image on a panel.",
+
+  "crop.title": "Crop",
+  "crop.help": "Drag the image to move it, wheel to zoom",
+  "crop.zoom": "Zoom",
+  "crop.remove": "Remove image",
+  "crop.done": "Done",
 
   "templates.title": "Panel layouts",
   "templates.help": "Pick a starting layout. You can then move and resize each panel.",
@@ -54,6 +69,7 @@ export const en: Messages = {
   "shortcuts.toolPanel": "Panel tool (draw a panel)",
   "shortcuts.select": "Select an element",
   "shortcuts.selectAdd": "Add to or remove from the selection",
+  "shortcuts.panelImage": "Empty panel: import an image · Panel with image: crop (Esc when done)",
   "shortcuts.delete": "Delete the selection",
   "shortcuts.duplicate": "Duplicate the selection",
   "shortcuts.nudge": "Move by 1 px",
@@ -71,6 +87,7 @@ export const en: Messages = {
   "keys.space": "Space",
   "keys.arrows": "Arrows",
   "keys.click": "Click",
+  "keys.doubleClick": "Double-click",
   "keys.drag": "Drag",
   "keys.wheel": "Wheel",
 

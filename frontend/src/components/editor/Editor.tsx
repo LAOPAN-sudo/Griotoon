@@ -7,6 +7,9 @@ import { LanguageSwitcher } from "@/components/ui/LanguageSwitcher";
 import { EditorShortcuts } from "./EditorShortcuts";
 import { HistoryControls } from "./HistoryControls";
 import { ShortcutsButton, ShortcutsDialog } from "./ShortcutsDialog";
+import { CropBar } from "./CropBar";
+import { ImagePicker } from "./ImagePicker";
+import { Toast } from "@/components/ui/Toast";
 import { Toolbar } from "./Toolbar";
 import { ZoomControls } from "./ZoomControls";
 
@@ -32,6 +35,8 @@ export function Editor() {
     <div className="flex h-dvh flex-col overflow-hidden">
       <EditorShortcuts />
       <ShortcutsDialog />
+      <ImagePicker />
+      <Toast />
       <header className="flex h-12 shrink-0 items-center justify-between gap-4 border-b border-zinc-200 bg-white px-4">
         <div className="flex items-center gap-3">
           <Link
@@ -55,6 +60,7 @@ export function Editor() {
         <Toolbar />
         <main className="relative flex-1 bg-zinc-200">
           <EditorCanvas />
+          <CropBar />
         </main>
       </div>
     </div>

@@ -8,6 +8,10 @@ import { HistoryControls } from "./HistoryControls";
 import { EditorShortcuts } from "./EditorShortcuts";
 import { ShortcutsButton, ShortcutsDialog } from "./ShortcutsDialog";
 import { useUiStore } from "@/store/uiStore";
+import { Toolbar } from "./Toolbar";
+import { CropBar } from "./CropBar";
+import { Toast } from "@/components/ui/Toast";
+import { importImageIntoPanel } from "./imageImport";
 
 const panels = () => useEditorStore.getState().page.panels;
 
@@ -193,5 +197,85 @@ describe("ShortcutsDialog", () => {
     expect(dialog).toHaveTextContent("Duplicate the selection");
     expect(dialog).toHaveTextContent("Shift");
     expect(dialog).not.toHaveTextContent("Maj");
+  });
+});
+
+describe("images", () => {
+  const image = { src: "data:image/webp;base64,AAAA", width: 800, height: 600, offsetX: 0, offsetY: 0, scale: 1 };
+  const store = () => useEditorStore.getState();
+
+  beforeEach(() => {
+    useUiStore.setState({ notice: null });
+  });
+
+  it("enables the Image button only when one panel is selected", () => {
+    render(<Toolbar />);
+    const button = screen.getByRole("button", { name: "Image" });
+    expect(button).toBeDisabled();
+    act(() => {
+      store().select(store().addPanel());
+    });
+    expect(button).toBeEnabled();
+    act(() => {
+      store().select([store().addPanel(), store().addPanel()]);
+    });
+    expect(button).toBeDisabled();
+  });
+
+  it("refuses a file that is not an image, with a translated message", async () => {
+    render(<Toast />);
+    const id = store().addPanel();
+    const pdf = new File(["%PDF"], "histoire.pdf", { type: "application/pdf" });
+    let ok = true;
+    await act(async () => {
+      ok = await importImageIntoPanel(pdf, id);
+    });
+    expect(ok).toBe(false);
+    expect(screen.getByRole("alert")).toHaveTextContent("n'est pas une image");
+    expect(panels()[0].image).toBeNull();
+  });
+
+  it("shows the crop bar, ends the session with Escape and can remove the image", () => {
+    render(
+      <>
+        <EditorShortcuts />
+        <CropBar />
+      </>,
+    );
+    const id = store().addPanel({ w: 400, h: 300 });
+    act(() => {
+      store().setPanelImage(id, image);
+      store().startCrop(id);
+    });
+    expect(screen.getByRole("toolbar", { name: "Recadrage" })).toBeInTheDocument();
+
+    // Delete must not remove the panel while cropping.
+    fireEvent.keyDown(window, { key: "Delete" });
+    expect(panels()).toHaveLength(1);
+
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(store().crop).toBeNull();
+    expect(screen.queryByRole("toolbar")).toBeNull();
+
+    act(() => {
+      store().startCrop(id);
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Retirer l'image" }));
+    expect(panels()[0].image).toBeNull();
+    expect(store().crop).toBeNull();
+  });
+
+  it("zooms the image with the crop slider, keeping it inside the panel", () => {
+    render(<CropBar />);
+    const id = store().addPanel({ w: 400, h: 300 });
+    act(() => {
+      store().setPanelImage(id, { ...image, scale: 0.5, offsetX: 0, offsetY: 0 });
+      store().startCrop(id);
+    });
+    fireEvent.change(screen.getByRole("slider"), { target: { value: "1" } });
+    const cropped = store().crop!.image;
+    expect(cropped.scale).toBeCloseTo(1);
+    expect(cropped.offsetX).toBeLessThanOrEqual(0);
+    expect(cropped.offsetX + cropped.width * cropped.scale).toBeGreaterThanOrEqual(400);
   });
 });

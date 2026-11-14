@@ -19,6 +19,16 @@ export function EditorShortcuts() {
       const store = useEditorStore.getState();
       const { selectedIds } = store;
 
+      // While cropping, Escape ends the session; selection shortcuts are off.
+      if (store.crop) {
+        if (action.type === "escape") {
+          e.preventDefault();
+          store.endCrop();
+          return;
+        }
+        if (action.type === "delete" || action.type === "duplicate" || action.type === "nudge") return;
+      }
+
       switch (action.type) {
         case "undo":
           store.undo();

@@ -57,7 +57,7 @@ describe("help list", () => {
       "keys.backspace": "Backspace",
       "keys.arrows": "ArrowLeft",
     };
-    const mouse = ["keys.click", "keys.drag", "keys.wheel", "keys.space"];
+    const mouse = ["keys.click", "keys.doubleClick", "keys.drag", "keys.wheel", "keys.space"];
     let checked = 0;
     for (const group of SHORTCUT_GROUPS) {
       for (const item of group.items) {

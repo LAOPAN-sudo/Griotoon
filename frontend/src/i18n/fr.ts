@@ -24,6 +24,21 @@ export const fr = {
   "toolbar.templates": "Gabarit",
   "toolbar.select": "Sélection",
   "toolbar.panel": "Case",
+  "toolbar.image": "Image",
+  "toolbar.imageTitle": "Importer une image dans la case sélectionnée",
+  "toolbar.imageDisabled": "Sélectionne une case pour y importer une image",
+
+  "image.importing": "Import de l'image…",
+  "image.errorNotImage": "Ce fichier n'est pas une image prise en charge (JPEG, PNG, WebP, GIF, AVIF).",
+  "image.errorTooLarge": "Cette image est trop lourde (maximum {max} Mo).",
+  "image.errorDecode": "Impossible de lire cette image. Essaie un autre fichier.",
+  "image.errorDropOutside": "Dépose l'image sur une case.",
+
+  "crop.title": "Recadrage",
+  "crop.help": "Glisse l'image pour la déplacer, molette pour zoomer",
+  "crop.zoom": "Zoom",
+  "crop.remove": "Retirer l'image",
+  "crop.done": "Terminer",
 
   "templates.title": "Gabarits de cases",
   "templates.help": "Choisis un découpage de départ. Tu pourras ensuite déplacer et redimensionner chaque case.",
@@ -56,6 +71,7 @@ export const fr = {
   "shortcuts.toolPanel": "Outil Case (tracer une case)",
   "shortcuts.select": "Sélectionner un élément",
   "shortcuts.selectAdd": "Ajouter ou retirer de la sélection",
+  "shortcuts.panelImage": "Case vide : importer une image · Case avec image : recadrer (Échap pour terminer)",
   "shortcuts.delete": "Supprimer la sélection",
   "shortcuts.duplicate": "Dupliquer la sélection",
   "shortcuts.nudge": "Déplacer de 1 px",
@@ -73,6 +89,7 @@ export const fr = {
   "keys.space": "Espace",
   "keys.arrows": "Flèches",
   "keys.click": "Clic",
+  "keys.doubleClick": "Double-clic",
   "keys.drag": "Glisser",
   "keys.wheel": "Molette",
 

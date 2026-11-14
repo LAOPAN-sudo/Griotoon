@@ -4,9 +4,15 @@
 export type BubbleType = "speech" | "thought" | "shout" | "narration";
 
 export interface PanelImage {
+  /** Phase 1: WebP dataURL. Phase 2: MinIO URL. */
   src: string;
+  /** Real size of the stored image, in pixels. */
+  width: number;
+  height: number;
+  /** Crop: top-left corner of the image inside the panel, in page pixels. */
   offsetX: number;
   offsetY: number;
+  /** Displayed size = width × scale, height × scale. */
   scale: number;
 }
 

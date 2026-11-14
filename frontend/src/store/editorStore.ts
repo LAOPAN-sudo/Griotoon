@@ -1,7 +1,7 @@
 import { create, type StateCreator } from "zustand";
 import { produce, type Draft } from "immer";
 import { nanoid } from "nanoid";
-import type { Bubble, Page, PageElement, Panel, Sfx } from "@/types/page";
+import type { Bubble, Page, PageElement, Panel, PanelImage, Sfx } from "@/types/page";
 import { allElements, createBubble, createEmptyPage, createPanel, createSfx, nextZ } from "@/lib/page";
 
 export const HISTORY_LIMIT = 100;
@@ -14,13 +14,24 @@ type Patch<T> = Partial<Omit<T, "id">>;
 /** Patch for any element type (panel, bubble or sfx). */
 export type ElementPatch = Patch<Panel> | Patch<Bubble> | Patch<Sfx>;
 
-/** Active editor tool. Bubble, sfx and image tools come in later steps. */
+/** Active editor tool. Bubble and sfx tools come in later steps. */
 export type Tool = "select" | "panel";
+
+/**
+ * Image crop session (double-click on a panel with an image). Changes are
+ * kept here while the user moves and zooms the image, then saved as ONE undo
+ * step when the session ends.
+ */
+export interface CropSession {
+  panelId: string;
+  image: PanelImage;
+}
 
 export interface EditorState {
   page: Page;
   selectedIds: string[];
   tool: Tool;
+  crop: CropSession | null;
   /** Previous page snapshots, oldest first. */
   past: Page[];
   /** Undone snapshots, most recently undone last. */
@@ -52,6 +63,15 @@ export interface EditorState {
   select: (ids: string | string[] | null, additive?: boolean) => void;
 
   setTool: (tool: Tool) => void;
+
+  /** Put an image in a panel (or remove it with null). Selects the panel. */
+  setPanelImage: (panelId: string, image: PanelImage | null) => void;
+  /** Start cropping a panel's image. Does nothing if the panel has no image. */
+  startCrop: (panelId: string) => void;
+  /** Update the image during a crop session (no history entry). */
+  updateCrop: (image: PanelImage) => void;
+  /** End the crop session, saving it (default) or discarding it. */
+  endCrop: (save?: boolean) => void;
 
   undo: () => void;
   redo: () => void;
@@ -98,12 +118,13 @@ export const editorStateCreator: StateCreator<EditorState> = (set, get) => {
     page: createEmptyPage(),
     selectedIds: [],
     tool: "select",
+    crop: null,
     past: [],
     future: [],
 
     loadPage: (page) => {
       lastMerge = null;
-      set({ page, selectedIds: [], past: [], future: [] });
+      set({ page, selectedIds: [], past: [], future: [], crop: null });
     },
 
     addPanel: (props) => {
@@ -212,6 +233,7 @@ export const editorStateCreator: StateCreator<EditorState> = (set, get) => {
     },
 
     removeElement: (ids) => {
+      get().endCrop(false);
       const toRemove = new Set(toArray(ids));
       const { page } = get();
       if (!allElements(page).some((el) => toRemove.has(el.id))) return;
@@ -228,6 +250,7 @@ export const editorStateCreator: StateCreator<EditorState> = (set, get) => {
     },
 
     applyTemplate: (panels) => {
+      get().endCrop(false);
       const oldIds = new Set(get().page.panels.map((p) => p.id));
       commit((d) => {
         // New panels go below everything else, in template order; the other
@@ -267,9 +290,53 @@ export const editorStateCreator: StateCreator<EditorState> = (set, get) => {
       set({ selectedIds: [...current] });
     },
 
-    setTool: (tool) => set({ tool }),
+    setTool: (tool) => {
+      get().endCrop();
+      set({ tool });
+    },
+
+    setPanelImage: (panelId, image) => {
+      get().endCrop(false);
+      if (!get().page.panels.some((p) => p.id === panelId)) return;
+      commit((d) => {
+        const panel = d.panels.find((p) => p.id === panelId);
+        if (panel) panel.image = image;
+      });
+      set({ selectedIds: [panelId] });
+    },
+
+    startCrop: (panelId) => {
+      const { crop, page } = get();
+      if (crop?.panelId === panelId) return;
+      get().endCrop();
+      const panel = page.panels.find((p) => p.id === panelId);
+      if (!panel?.image) return;
+      set({ crop: { panelId, image: panel.image }, selectedIds: [panelId], tool: "select" });
+    },
+
+    updateCrop: (image) => {
+      const { crop } = get();
+      if (crop) set({ crop: { ...crop, image } });
+    },
+
+    endCrop: (save = true) => {
+      const { crop } = get();
+      if (!crop) return;
+      set({ crop: null });
+      if (save) {
+        commit((d) => {
+          const panel = d.panels.find((p) => p.id === crop.panelId);
+          if (panel?.image) Object.assign(panel.image, crop.image);
+        });
+      }
+    },
 
     undo: () => {
+      // During a crop session, undo just cancels the session.
+      if (get().crop) {
+        get().endCrop(false);
+        return;
+      }
       lastMerge = null;
       const { page, past, future, selectedIds } = get();
       const previous = past.at(-1);
@@ -284,6 +351,10 @@ export const editorStateCreator: StateCreator<EditorState> = (set, get) => {
     },
 
     redo: () => {
+      if (get().crop) {
+        get().endCrop(false);
+        return;
+      }
       lastMerge = null;
       const { page, past, future, selectedIds } = get();
       const next = future.at(-1);

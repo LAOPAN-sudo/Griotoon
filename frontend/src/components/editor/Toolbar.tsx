@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useT, type MessageKey } from "@/i18n";
 import { useEditorStore, type Tool } from "@/store/editorStore";
 import { TemplatePicker } from "./TemplatePicker";
+import { openImagePicker } from "./imageImport";
 
 const toolButtonClass = (active: boolean) =>
   `flex flex-col items-center gap-1 rounded-md py-2 text-xs ${
@@ -35,6 +36,11 @@ export function Toolbar() {
   const t = useT();
   const activeTool = useEditorStore((s) => s.tool);
   const setTool = useEditorStore((s) => s.setTool);
+  // The Image button needs exactly one selected panel to put the image in.
+  const imageTarget = useEditorStore((s) => {
+    if (s.selectedIds.length !== 1) return null;
+    return s.page.panels.find((p) => p.id === s.selectedIds[0]) ?? null;
+  });
   const [templatesOpen, setTemplatesOpen] = useState(false);
   const popoverRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
@@ -81,6 +87,21 @@ export function Toolbar() {
         </button>
       ))}
 
+      <button
+        type="button"
+        disabled={!imageTarget}
+        title={imageTarget ? t("toolbar.imageTitle") : t("toolbar.imageDisabled")}
+        onClick={() => imageTarget && openImagePicker(imageTarget.id)}
+        className={`${toolButtonClass(false)} disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent`}
+      >
+        <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={1.8} aria-hidden="true">
+          <rect x="3" y="4" width="18" height="16" rx="1" />
+          <circle cx="9" cy="10" r="2" />
+          <path d="M21 17l-5-5-9 8" strokeLinejoin="round" />
+        </svg>
+        {t("toolbar.image")}
+      </button>
+
       <hr className="my-1 border-zinc-200" />
 
       <button
@@ -103,7 +124,7 @@ export function Toolbar() {
           ref={popoverRef}
           role="region"
           aria-label={t("templates.title")}
-          className="absolute left-full top-36 ml-2 w-72 rounded-lg border border-zinc-200 bg-white p-3 shadow-lg"
+          className="absolute left-full top-52 ml-2 w-72 rounded-lg border border-zinc-200 bg-white p-3 shadow-lg"
         >
           <h2 className="mb-1 text-sm font-semibold text-zinc-900">{t("templates.title")}</h2>
           <p className="mb-3 text-xs text-zinc-500">{t("templates.help")}</p>
