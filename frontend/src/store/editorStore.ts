@@ -70,7 +70,8 @@ export interface EditorState {
   setTool: (tool: Tool) => void;
 
   /** Page settings (background, margin, gutter). */
-  updatePage: (patch: Partial<Pick<Page, "background" | "margin" | "gutter">>) => void;
+  /** Change page settings. Changes with the same `mergeKey` within a second form one undo step. */
+  updatePage: (patch: Partial<Pick<Page, "background" | "margin" | "gutter">>, mergeKey?: string) => void;
   /** Hide or show elements (layers panel eye). Hidden elements are deselected. */
   setHidden: (ids: string[], hidden: boolean) => void;
 
@@ -316,13 +317,13 @@ export const editorStateCreator: StateCreator<EditorState> = (set, get) => {
       set({ tool });
     },
 
-    updatePage: (patch) =>
+    updatePage: (patch, mergeKey) =>
       commit((d) => {
         for (const [key, value] of Object.entries(patch)) {
           const k = key as keyof typeof patch;
           if (value !== undefined && d[k] !== value) (d as Record<string, unknown>)[k] = value;
         }
-      }),
+      }, mergeKey),
 
     setHidden: (ids, hidden) => {
       const wanted = new Set(ids);

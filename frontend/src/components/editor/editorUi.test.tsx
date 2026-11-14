@@ -505,6 +505,20 @@ describe("properties panel", () => {
     expect(panels().map((p) => p.fill)).toEqual([undefined, undefined]);
   });
 
+  it("picks a custom colour inside the panel (no native popup)", () => {
+    render(<PropertiesPanel />);
+    const background = screen.getByRole("group", { name: "Fond" });
+    const other = within(background).getByRole("button", { name: "Autre couleur" });
+    expect(other).toHaveAttribute("aria-expanded", "false");
+    fireEvent.click(other);
+    expect(other).toHaveAttribute("aria-expanded", "true");
+    const hex = within(background).getByLabelText("Code couleur (hexadécimal)");
+    fireEvent.change(hex, { target: { value: "3a7bd5" } });
+    expect(store().page.background).toBe("#3A7BD5");
+    fireEvent.click(within(background).getByRole("button", { name: "OK" }));
+    expect(within(background).queryByLabelText("Code couleur (hexadécimal)")).toBeNull();
+  });
+
   it("merges arrow-key steps into one undo step", () => {
     render(<PropertiesPanel />);
     act(() => {

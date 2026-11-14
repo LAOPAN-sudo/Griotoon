@@ -4,7 +4,9 @@
 // store on Enter / blur (number and text fields) or immediately (swatches,
 // segmented choices), so each change is one undo step.
 
-import { useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
+import { HexColorInput, HexColorPicker } from "react-colorful";
+import { useT } from "@/i18n";
 
 export function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -96,15 +98,48 @@ interface ColorFieldProps {
   label: string;
   value: string | null;
   swatches: Swatch[];
+  /** Label of the "other colour" button; omit to offer only the swatches. */
   customLabel?: string;
-  /** `merge` is true for the native colour picker, which fires many changes while dragging. */
+  /** `merge` is true while dragging in the colour picker, which fires many changes. */
   onPick: (color: string, merge: boolean) => void;
 }
 
+/**
+ * Swatches plus an "other colour" picker. The picker is drawn inside the
+ * panel (react-colorful) rather than with the browser's <input type="color">,
+ * whose popup is placed by the OS and can open off-screen next to the sidebar.
+ */
 export function ColorField({ label, value, swatches, customLabel, onPick }: ColorFieldProps) {
+  const t = useT();
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
   const current = value?.toUpperCase() ?? null;
+  const isHex = /^#[0-9a-f]{6}$/i.test(value ?? "");
+  const custom = isHex && !swatches.some((s) => s.value.toUpperCase() === current);
+
+  // Close on a click outside the field or on Escape.
+  useEffect(() => {
+    if (!open) return;
+    const onPointerDown = (e: PointerEvent) => {
+      if (!rootRef.current?.contains(e.target as Node)) setOpen(false);
+    };
+    window.addEventListener("pointerdown", onPointerDown);
+    return () => window.removeEventListener("pointerdown", onPointerDown);
+  }, [open]);
+
   return (
-    <div role="group" aria-label={label} className="flex flex-col gap-1.5 text-xs text-zinc-600">
+    <div
+      ref={rootRef}
+      role="group"
+      aria-label={label}
+      className="flex flex-col gap-1.5 text-xs text-zinc-600"
+      onKeyDown={(e) => {
+        if (open && e.key === "Escape") {
+          e.stopPropagation();
+          setOpen(false);
+        }
+      }}
+    >
       {label}
       <div className="flex flex-wrap items-center gap-1.5">
         {swatches.map((s) => {
@@ -125,22 +160,49 @@ export function ColorField({ label, value, swatches, customLabel, onPick }: Colo
           );
         })}
         {customLabel && (
-          <label className="relative h-6 w-6 cursor-pointer" title={customLabel}>
-            <span className="sr-only">{customLabel}</span>
-            <input
-              type="color"
-              value={/^#[0-9a-f]{6}$/i.test(value ?? "") ? value! : "#000000"}
-              onChange={(e) => onPick(e.target.value, true)}
-              className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
-            />
-            <span
-              aria-hidden="true"
-              className="block h-6 w-6 rounded-full border border-zinc-300"
-              style={{ background: "conic-gradient(red, yellow, lime, cyan, blue, magenta, red)" }}
-            />
-          </label>
+          <button
+            type="button"
+            aria-label={customLabel}
+            title={customLabel}
+            aria-expanded={open}
+            onClick={() => setOpen((o) => !o)}
+            className={`h-6 w-6 rounded-full border border-zinc-300 shadow-sm ${
+              custom || open ? "ring-2 ring-zinc-900 ring-offset-2" : ""
+            }`}
+            style={{
+              // Shows the custom colour once chosen, a rainbow otherwise.
+              background: custom ? value! : "conic-gradient(red, yellow, lime, cyan, blue, magenta, red)",
+            }}
+          />
         )}
       </div>
+      {open && customLabel && (
+        <div
+          // Scroll the sidebar so the whole picker is visible when it opens.
+          ref={(el) => el?.scrollIntoView?.({ block: "nearest" })}
+          className="griotoon-picker mt-1 space-y-2 rounded-md border border-zinc-200 bg-zinc-50 p-2"
+        >
+          <HexColorPicker color={isHex ? value! : "#000000"} onChange={(c) => onPick(c.toUpperCase(), true)} />
+          <div className="flex items-center gap-2">
+            <label className="flex flex-1 items-center gap-1 rounded-md border border-zinc-300 bg-white px-2 focus-within:border-zinc-900">
+              <span aria-hidden="true" className="text-zinc-400">#</span>
+              <HexColorInput
+                aria-label={t("color.hex")}
+                color={isHex ? value! : "#000000"}
+                onChange={(c) => onPick(c.toUpperCase(), false)}
+                className="w-full min-w-0 bg-transparent py-1 text-sm uppercase text-zinc-900 outline-none tabular-nums"
+              />
+            </label>
+            <button
+              type="button"
+              onClick={() => setOpen(false)}
+              className="rounded-md bg-zinc-900 px-3 py-1 text-sm text-white hover:bg-zinc-700"
+            >
+              {t("color.done")}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -196,6 +196,8 @@ export const fr = {
 
   "common.cancel": "Annuler",
   "common.close": "Fermer",
+  "color.hex": "Code couleur (hexadécimal)",
+  "color.done": "OK",
 
   "language.label": "Langue",
   "language.fr": "Français",

@@ -124,11 +124,11 @@ function PageProperties({ t }: { t: T }) {
         value={page.background}
         swatches={PAGE_BACKGROUNDS.map((b) => ({ value: b.value, label: t(b.key) }))}
         customLabel={t("sfx.colorCustom")}
-        onPick={(background) => update({ background })}
+        onPick={(background, m) => update({ background }, m ? "page:background" : undefined)}
       />
       <Row>
-        <NumberField label={t("properties.margin")} value={page.margin} min={0} max={400} unit="px" onCommit={(margin) => update({ margin })} />
-        <NumberField label={t("properties.gutter")} value={page.gutter} min={0} max={200} unit="px" onCommit={(gutter) => update({ gutter })} />
+        <NumberField label={t("properties.margin")} value={page.margin} min={0} max={400} unit="px" onCommit={(margin, m) => update({ margin }, m ? "page:margin" : undefined)} />
+        <NumberField label={t("properties.gutter")} value={page.gutter} min={0} max={200} unit="px" onCommit={(gutter, m) => update({ gutter }, m ? "page:gutter" : undefined)} />
       </Row>
       <p className="text-xs text-zinc-500">{t("properties.spacingHelp")}</p>
     </Section>

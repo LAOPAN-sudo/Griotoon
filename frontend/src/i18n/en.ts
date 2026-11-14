@@ -194,6 +194,8 @@ export const en: Messages = {
 
   "common.cancel": "Cancel",
   "common.close": "Close",
+  "color.hex": "Colour code (hexadecimal)",
+  "color.done": "Done",
 
   "language.label": "Language",
   "language.fr": "Français",
