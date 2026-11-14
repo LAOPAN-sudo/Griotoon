@@ -12,7 +12,8 @@ export type ShortcutAction =
   | { type: "nudge"; dx: number; dy: number }
   | { type: "tool"; tool: Tool }
   | { type: "escape" }
-  | { type: "help" };
+  | { type: "help" }
+  | { type: "page"; delta: number };
 
 type KeyInfo = Pick<KeyboardEvent, "key" | "ctrlKey" | "metaKey" | "shiftKey" | "altKey">;
 
@@ -39,6 +40,8 @@ export function matchShortcut(e: KeyInfo): ShortcutAction | null {
   if (key === "?") return { type: "help" };
   if (key === "Delete" || key === "Backspace") return { type: "delete" };
   if (key === "Escape") return { type: "escape" };
+  if (key === "PageDown") return { type: "page", delta: 1 };
+  if (key === "PageUp") return { type: "page", delta: -1 };
 
   const arrow = ARROWS[key];
   if (arrow) {
@@ -124,6 +127,14 @@ export const SHORTCUT_GROUPS: ShortcutGroup[] = [
       { combos: [["keys.wheel"]], descriptionKey: "shortcuts.scroll" },
       { combos: [["keys.shift", "keys.wheel"]], descriptionKey: "shortcuts.scrollHorizontal" },
       { combos: [["keys.space", "keys.drag"]], descriptionKey: "shortcuts.pan" },
+    ],
+  },
+  {
+    titleKey: "shortcuts.groupPages",
+    items: [
+      { combos: [["keys.pageDown"]], descriptionKey: "shortcuts.nextPage" },
+      { combos: [["keys.pageUp"]], descriptionKey: "shortcuts.previousPage" },
+      { combos: [["keys.alt", "←"], ["keys.alt", "→"]], descriptionKey: "shortcuts.movePage" },
     ],
   },
 ];

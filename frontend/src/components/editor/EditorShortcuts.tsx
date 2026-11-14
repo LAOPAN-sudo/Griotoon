@@ -55,6 +55,9 @@ export function EditorShortcuts() {
         case "help":
           useUiStore.getState().setShortcutsOpen(true);
           break;
+        case "page":
+          store.goToPage(store.currentPage + action.delta);
+          break;
         case "escape":
           if (store.tool !== "select") store.setTool("select");
           else store.select(null);

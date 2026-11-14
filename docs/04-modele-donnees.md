@@ -88,6 +88,7 @@ Ordre d'affichage : les bulles et les onomatopées sont toujours dessinées au-d
 ```jsonc
 {
   "version": 1,
+  "id": "pg_k3x9a2bq",        // identifiant stable de la page (miniatures, réordonnancement, puis ligne en base)
   "width": 1240,              // A4 à 150 dpi : 1240 × 1754
   "height": 1754,
   "background": "#FFFFFF",
@@ -166,8 +167,25 @@ export interface Sfx {
   z: number;
 }
 export interface Page {
-  version: 1; width: number; height: number; background: string;
+  version: 1; id: string; width: number; height: number; background: string;
   gutter: number; margin: number;
   panels: Panel[]; bubbles: Bubble[]; sfx: Sfx[];
+}
+export interface Chapter {
+  version: 1;
+  pages: Page[];   // dans l'ordre de lecture
+}
+```
+
+### Sauvegarde locale (phase 1)
+
+Tant qu'il n'y a pas de backend, le chapitre est enregistré dans le navigateur (IndexedDB, clé `griotoon:current-page`) :
+
+```jsonc
+{
+  "version": 2,              // la version 1 (étape 9) contenait une seule page ; elle est convertie à la lecture
+  "savedAt": 1763140000000,  // date de l'enregistrement (ms)
+  "chapter": { "version": 1, "pages": [ /* Page… */ ] },
+  "currentPage": 0           // page rouverte au prochain chargement
 }
 ```

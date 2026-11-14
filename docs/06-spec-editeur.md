@@ -97,6 +97,12 @@ Le choix d'un gabarit remplace les cases existantes après confirmation (« Remp
 ### Étape 11 : plusieurs pages
 - Barre de miniatures en bas : ajouter, dupliquer, supprimer, réordonner par glisser-déposer.
 - Le store gère `chapter.pages[]` et l'index de la page courante.
+- Mise en œuvre : le store garde `pages`, `currentPage` et `page` (= `pages[currentPage]`, la page modifiée par toutes les actions existantes). Une étape d'annulation contient toutes les pages : on peut annuler un ajout, une suppression ou un déplacement de page, et annuler / rétablir réaffiche la page concernée. Changer de page n'est pas une étape (sélection vidée, recadrage en cours enregistré).
+- « Réinitialiser la page » (panneau Page, sans sélection) : retire toutes les cases, images, bulles et onomatopées de la page affichée, après confirmation ; le fond, la marge et la gouttière restent. Une seule étape d'annulation.
+- Nouvelle page : vide, avec le format, le fond, la marge et la gouttière de la page courante. Duplication : copie juste après l'original. Suppression : confirmation ; la dernière page ne peut pas être supprimée.
+- Barre des pages : clic pour ouvrir, glisser ou Alt + ←/→ pour déplacer, boutons Dupliquer et Supprimer au survol (toujours visibles sur la page courante). Raccourcis Page préc. / Page suiv.
+- Miniatures et export dessinés par la même fonction (`renderPage.tsx`) : la page est rendue depuis son JSON dans un canvas caché, avec les composants de l'éditeur. Miniatures redessinées 0,4 s après la dernière modification, seulement pour la page qui a changé.
+- Export : PNG = page affichée ; PDF = tout le chapitre, une page A4 par planche, dessinées une à une pour limiter la mémoire.
 
 ## Raccourcis clavier
 

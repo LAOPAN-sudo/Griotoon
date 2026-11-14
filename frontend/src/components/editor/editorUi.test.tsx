@@ -457,6 +457,23 @@ describe("properties panel", () => {
     expect(store().page.background).toBe("#FFF8E7");
   });
 
+  it("resets the page after confirmation", () => {
+    render(<PropertiesPanel />);
+    expect(screen.getByRole("button", { name: "Réinitialiser la page" })).toBeDisabled();
+    act(() => {
+      store().addPanel();
+      store().addBubble();
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Réinitialiser la page" }));
+    expect(screen.getByRole("dialog")).toHaveTextContent("Réinitialiser la page 1 ?");
+    fireEvent.click(screen.getByRole("button", { name: "Annuler" }));
+    expect(panels()).toHaveLength(1);
+    fireEvent.click(screen.getByRole("button", { name: "Réinitialiser la page" }));
+    fireEvent.click(screen.getByRole("button", { name: "Réinitialiser" }));
+    expect(panels()).toHaveLength(0);
+    expect(store().page.bubbles).toHaveLength(0);
+  });
+
   it("ignores invalid numbers and clamps to the limits", () => {
     render(<PropertiesPanel />);
     const gutter = screen.getByLabelText("Gouttière");

@@ -15,6 +15,7 @@ import { Toolbar } from "./Toolbar";
 import { ZoomControls } from "./ZoomControls";
 import { SaveIndicator } from "./SaveIndicator";
 import { ExportMenu } from "./ExportMenu";
+import { PageStrip } from "./PageStrip";
 import { useLocalSave } from "./useLocalSave";
 
 function CanvasLoading() {
@@ -67,10 +68,13 @@ export function Editor() {
 
       <div className="flex min-h-0 flex-1">
         <Toolbar />
-        <main className="relative flex-1 bg-zinc-200">
-          {ready ? <EditorCanvas /> : <CanvasLoading />}
-          <CropBar />
-        </main>
+        <div className="flex min-w-0 flex-1 flex-col">
+          <main className="relative min-h-0 flex-1 bg-zinc-200">
+            {ready ? <EditorCanvas /> : <CanvasLoading />}
+            <CropBar />
+          </main>
+          {ready && <PageStrip />}
+        </div>
         <Sidebar />
       </div>
     </div>

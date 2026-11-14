@@ -1,7 +1,8 @@
 import { create, type StateCreator } from "zustand";
 import { produce, type Draft } from "immer";
 import { nanoid } from "nanoid";
-import type { Bubble, BubbleType, Page, PageElement, Panel, PanelImage, Sfx } from "@/types/page";
+import type { Bubble, BubbleType, Chapter, Page, PageElement, Panel, PanelImage, Sfx } from "@/types/page";
+import { copyPage, createChapter, createPageLike, insertAt, moveItem, removeAt } from "@/lib/chapter";
 import { defaultTail } from "@/lib/bubbles";
 import { allElements, createBubble, createEmptyPage, createPanel, createSfx, nextZ } from "@/lib/page";
 
@@ -28,7 +29,23 @@ export interface CropSession {
   image: PanelImage;
 }
 
+/**
+ * One undo step: the pages of the chapter, the page to show with them, and
+ * the page shown on the other side of the step (so that undo AND redo both
+ * bring the changed page back on screen).
+ */
+export interface Snapshot {
+  pages: Page[];
+  currentPage: number;
+  otherPage: number;
+}
+
 export interface EditorState {
+  /** Pages of the chapter, in reading order. */
+  pages: Page[];
+  /** Index of the page being edited. */
+  currentPage: number;
+  /** The page being edited: always `pages[currentPage]` (kept as a field for simple selectors). */
   page: Page;
   selectedIds: string[];
   tool: Tool;
@@ -37,13 +54,30 @@ export interface EditorState {
   newBubbleType: BubbleType;
   /** Bubble or sound effect whose text is being edited in the overlay text field. */
   editingId: string | null;
-  /** Previous page snapshots, oldest first. */
-  past: Page[];
+  /** Previous snapshots, oldest first. */
+  past: Snapshot[];
   /** Undone snapshots, most recently undone last. */
-  future: Page[];
+  future: Snapshot[];
 
-  /** Replace the page (e.g. restore from storage). Clears history and selection. */
+  /** Replace the chapter (e.g. restore from storage). Clears history and selection. */
+  loadChapter: (chapter: Chapter, currentPage?: number) => void;
+  /** Replace everything with a one-page chapter. */
   loadPage: (page: Page) => void;
+  /** The chapter as saved and exported. */
+  getChapter: () => Chapter;
+
+  /** Show another page (not an undo step). */
+  goToPage: (index: number) => void;
+  /** Add an empty page (same format and settings) after the current one and show it. */
+  addPage: () => void;
+  /** Copy a page (the current one by default) right after it and show the copy. */
+  duplicatePage: (index?: number) => void;
+  /** Delete a page. The last remaining page cannot be deleted. */
+  removePage: (index: number) => void;
+  /** Move a page to another position; the page being edited stays the same. */
+  movePage: (from: number, to: number) => void;
+  /** Remove every element of the current page (panels, images, bubbles, sfx); its settings stay. */
+  resetPage: () => void;
 
   addPanel: (props?: Partial<Panel>) => string;
   updatePanel: (id: string, patch: Patch<Panel>) => void;
@@ -106,7 +140,7 @@ export const editorStateCreator: StateCreator<EditorState> = (set, get) => {
   let lastMerge: { key: string; time: number } | null = null;
 
   const commit = (recipe: (draft: Draft<Page>) => void, mergeKey?: string) => {
-    const { page, past } = get();
+    const { page, pages, currentPage, past } = get();
     const next = produce(page, recipe);
     if (next === page) return; // nothing changed: no history entry
 
@@ -118,11 +152,48 @@ export const editorStateCreator: StateCreator<EditorState> = (set, get) => {
       past.length > 0;
     lastMerge = mergeKey === undefined ? null : { key: mergeKey, time: now };
 
+    const nextPages = pages.slice();
+    nextPages[currentPage] = next;
     set({
       page: next,
+      pages: nextPages,
       // When merging, the step before the first change stays the undo target.
-      past: merge ? past : [...past, page].slice(-HISTORY_LIMIT),
+      past: merge ? past : [...past, { pages, currentPage, otherPage: currentPage }].slice(-HISTORY_LIMIT),
       future: [],
+    });
+  };
+
+  /**
+   * Change the list of pages (add, copy, delete, move) as one undo step, and
+   * show `currentPage`. Callers end any crop session first, so that `pages`
+   * includes it.
+   */
+  const commitPages = (pages: Page[], currentPage: number) => {
+    lastMerge = null;
+    const before = get();
+    set({
+      pages,
+      currentPage,
+      page: pages[currentPage],
+      past: [...before.past, { pages: before.pages, currentPage: before.currentPage, otherPage: currentPage }].slice(-HISTORY_LIMIT),
+      future: [],
+      selectedIds: currentPage === before.currentPage && pages[currentPage] === before.page ? before.selectedIds : [],
+      editingId: null,
+    });
+  };
+
+  /** Show a snapshot (undo / redo). The selection is kept for elements still on the same page. */
+  const restore = (snapshot: Snapshot) => {
+    const { selectedIds, currentPage, page } = get();
+    const next = snapshot.pages[snapshot.currentPage];
+    const samePage = snapshot.currentPage === currentPage && next.id === page.id;
+    const existing = new Set(allElements(next).map((el) => el.id));
+    set({
+      pages: snapshot.pages,
+      currentPage: snapshot.currentPage,
+      page: next,
+      selectedIds: samePage ? selectedIds.filter((id) => existing.has(id)) : [],
+      editingId: null,
     });
   };
 
@@ -131,8 +202,11 @@ export const editorStateCreator: StateCreator<EditorState> = (set, get) => {
     d.bubbles.find((b) => b.id === id) ??
     d.sfx.find((s) => s.id === id);
 
+  const firstPage = createEmptyPage();
   return {
-    page: createEmptyPage(),
+    pages: [firstPage],
+    currentPage: 0,
+    page: firstPage,
     selectedIds: [],
     tool: "select",
     crop: null,
@@ -141,9 +215,57 @@ export const editorStateCreator: StateCreator<EditorState> = (set, get) => {
     past: [],
     future: [],
 
-    loadPage: (page) => {
+    loadChapter: (chapter, currentPage = 0) => {
       lastMerge = null;
-      set({ page, selectedIds: [], past: [], future: [], crop: null, editingId: null });
+      const pages = chapter.pages.length > 0 ? chapter.pages : [createEmptyPage()];
+      const index = Math.max(0, Math.min(pages.length - 1, currentPage));
+      set({ pages, currentPage: index, page: pages[index], selectedIds: [], past: [], future: [], crop: null, editingId: null });
+    },
+
+    loadPage: (page) => get().loadChapter(createChapter([page])),
+
+    getChapter: () => createChapter(get().pages),
+
+    goToPage: (index) => {
+      const { pages, currentPage } = get();
+      if (index === currentPage || index < 0 || index >= pages.length) return;
+      get().endCrop();
+      lastMerge = null;
+      // Read the pages again: ending a crop session may have changed the current page.
+      const latest = get().pages;
+      set({ currentPage: index, page: latest[index], selectedIds: [], editingId: null });
+    },
+
+    addPage: () => {
+      get().endCrop();
+      const { pages, currentPage, page } = get();
+      commitPages(insertAt(pages, currentPage + 1, createPageLike(page)), currentPage + 1);
+    },
+
+    duplicatePage: (index) => {
+      get().endCrop();
+      const { pages, currentPage } = get();
+      const i = index ?? currentPage;
+      if (!pages[i]) return;
+      commitPages(insertAt(pages, i + 1, copyPage(pages[i])), i + 1);
+    },
+
+    removePage: (index) => {
+      get().endCrop();
+      const { pages, currentPage } = get();
+      if (pages.length <= 1 || !pages[index]) return;
+      const next = removeAt(pages, index);
+      // Keep showing the same page; if it was the deleted one, show its neighbour.
+      const current = index < currentPage ? currentPage - 1 : Math.min(currentPage, next.length - 1);
+      commitPages(next, current);
+    },
+
+    movePage: (from, to) => {
+      get().endCrop();
+      const { pages, page } = get();
+      const next = moveItem(pages, from, to);
+      if (next === pages) return;
+      commitPages(next, next.findIndex((p) => p.id === page.id));
     },
 
     addPanel: (props) => {
@@ -395,6 +517,16 @@ export const editorStateCreator: StateCreator<EditorState> = (set, get) => {
       }
     },
 
+    resetPage: () => {
+      get().endCrop(false);
+      commit((d) => {
+        if (d.panels.length) d.panels = [];
+        if (d.bubbles.length) d.bubbles = [];
+        if (d.sfx.length) d.sfx = [];
+      });
+      set({ selectedIds: [], editingId: null });
+    },
+
     undo: () => {
       // During a crop session, undo just cancels the session.
       if (get().crop) {
@@ -402,16 +534,12 @@ export const editorStateCreator: StateCreator<EditorState> = (set, get) => {
         return;
       }
       lastMerge = null;
-      const { page, past, future, selectedIds } = get();
+      const { pages, past, future } = get();
       const previous = past.at(-1);
       if (!previous) return;
-      const existing = new Set(allElements(previous).map((el) => el.id));
-      set({
-        page: previous,
-        past: past.slice(0, -1),
-        future: [...future, page],
-        selectedIds: selectedIds.filter((id) => existing.has(id)),
-      });
+      const redoStep = { pages, currentPage: previous.otherPage, otherPage: previous.currentPage };
+      set({ past: past.slice(0, -1), future: [...future, redoStep] });
+      restore(previous);
     },
 
     redo: () => {
@@ -420,16 +548,12 @@ export const editorStateCreator: StateCreator<EditorState> = (set, get) => {
         return;
       }
       lastMerge = null;
-      const { page, past, future, selectedIds } = get();
+      const { pages, past, future } = get();
       const next = future.at(-1);
       if (!next) return;
-      const existing = new Set(allElements(next).map((el) => el.id));
-      set({
-        page: next,
-        past: [...past, page].slice(-HISTORY_LIMIT),
-        future: future.slice(0, -1),
-        selectedIds: selectedIds.filter((id) => existing.has(id)),
-      });
+      const undoStep = { pages, currentPage: next.otherPage, otherPage: next.currentPage };
+      set({ past: [...past, undoStep].slice(-HISTORY_LIMIT), future: future.slice(0, -1) });
+      restore(next);
     },
   };
 };

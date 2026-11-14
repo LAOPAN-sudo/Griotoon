@@ -56,7 +56,7 @@ describe("local save", () => {
     });
     expect(screen.getByRole("status")).toHaveTextContent("Enregistrement…");
     await act(() => vi.advanceTimersByTimeAsync(1000));
-    expect((storage.data as SavedPage).page.panels).toHaveLength(1);
+    expect((storage.data as SavedPage).chapter.pages[0].panels).toHaveLength(1);
     expect(screen.getByRole("status")).toHaveTextContent("Enregistré ✓");
   });
 
@@ -71,7 +71,7 @@ describe("local save", () => {
     await act(async () => {
       document.dispatchEvent(new Event("visibilitychange"));
     });
-    expect((storage.data as SavedPage).page.margin).toBe(90);
+    expect((storage.data as SavedPage).chapter.pages[0].margin).toBe(90);
   });
 
   it("tells the user when the browser storage is full", async () => {

@@ -1,6 +1,8 @@
 "use client";
 
+import { useState } from "react";
 import { useShallow } from "zustand/react/shallow";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { useT, type MessageKey } from "@/i18n";
 import { BUBBLE_TYPES } from "@/lib/bubbles";
 import { clampSfxFontSize, SFX_COLORS, SFX_STROKES } from "@/lib/sfx";
@@ -131,7 +133,40 @@ function PageProperties({ t }: { t: T }) {
         <NumberField label={t("properties.gutter")} value={page.gutter} min={0} max={200} unit="px" onCommit={(gutter, m) => update({ gutter }, m ? "page:gutter" : undefined)} />
       </Row>
       <p className="text-xs text-zinc-500">{t("properties.spacingHelp")}</p>
+      <ResetPageButton t={t} />
     </Section>
+  );
+}
+
+/** Empties the current page after confirmation (one undo step). */
+function ResetPageButton({ t }: { t: T }) {
+  const [confirming, setConfirming] = useState(false);
+  const empty = useEditorStore((s) => s.page.panels.length + s.page.bubbles.length + s.page.sfx.length === 0);
+  const pageNumber = useEditorStore((s) => s.currentPage + 1);
+  return (
+    <>
+      <button
+        type="button"
+        disabled={empty}
+        title={empty ? t("properties.resetPageEmpty") : t("properties.resetPageHelp")}
+        onClick={() => setConfirming(true)}
+        className="w-full rounded-md border border-red-200 px-2 py-1.5 text-sm text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:border-zinc-200 disabled:text-zinc-400 disabled:hover:bg-transparent"
+      >
+        {t("properties.resetPage")}
+      </button>
+      <ConfirmDialog
+        open={confirming}
+        title={t("properties.resetPageTitle", { n: pageNumber })}
+        message={t("properties.resetPageMessage")}
+        confirmLabel={t("properties.resetPageConfirm")}
+        cancelLabel={t("common.cancel")}
+        onConfirm={() => {
+          useEditorStore.getState().resetPage();
+          setConfirming(false);
+        }}
+        onCancel={() => setConfirming(false)}
+      />
+    </>
   );
 }
 

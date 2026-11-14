@@ -2,14 +2,14 @@
 // writes the page. Pure logic (no React, no IndexedDB) so it can be tested
 // with fake timers.
 
-import type { Page } from "@/types/page";
-import type { PageStorage } from "./pageStorage";
+import type { PageStorage, SavedPage } from "./pageStorage";
 
 export type SaveStatus = "idle" | "pending" | "saving" | "saved" | "error";
 
 export interface AutosaveOptions {
   storage: PageStorage;
-  getPage: () => Page;
+  /** What to save: the chapter and the page being edited. */
+  getData: () => Pick<SavedPage, "chapter" | "currentPage">;
   /** Called with a listener; must return an unsubscribe function. The listener is called on each page change. */
   subscribe: (listener: () => void) => () => void;
   onStatus: (status: SaveStatus, info: { savedAt?: number; error?: unknown }) => void;
@@ -29,7 +29,7 @@ export const AUTOSAVE_DELAY_MS = 1000;
 
 export function createAutosave({
   storage,
-  getPage,
+  getData,
   subscribe,
   onStatus,
   delay = AUTOSAVE_DELAY_MS,
@@ -50,11 +50,11 @@ export function createAutosave({
     }
     if (!dirty) return;
     dirty = false;
-    const page = getPage();
+    const data = getData();
     const savedAt = now();
     onStatus("saving", {});
     running = storage
-      .save({ version: 1, savedAt, page })
+      .save({ version: 2, savedAt, ...data })
       .then(
         () => {
           if (!disposed) onStatus(dirty ? "pending" : "saved", { savedAt });

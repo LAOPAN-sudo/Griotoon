@@ -4,7 +4,8 @@
 // blocks the page while writing, IndexedDB allows hundreds of MB.
 
 import { del, get, set } from "idb-keyval";
-import type { Page } from "@/types/page";
+import { nanoid } from "nanoid";
+import type { Chapter, Page } from "@/types/page";
 
 /** Where the page is kept. An interface, so tests can use memory instead of IndexedDB. */
 export interface PageStorage {
@@ -13,11 +14,16 @@ export interface PageStorage {
   clear(): Promise<void>;
 }
 
-/** What is written: the page plus the time of the save. */
+/**
+ * What is written: the chapter, the page being edited and the time of the
+ * save. Version 1 (step 9) held a single page; it is still read (see
+ * parseSavedPage) so nothing is lost.
+ */
 export interface SavedPage {
-  version: 1;
+  version: 2;
   savedAt: number;
-  page: Page;
+  chapter: Chapter;
+  currentPage: number;
 }
 
 const KEY = "griotoon:current-page";
@@ -46,22 +52,39 @@ export function memoryPageStorage(initial?: unknown): PageStorage & { data: unkn
 const isObject = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null;
 const isNumber = (v: unknown): v is number => typeof v === "number" && Number.isFinite(v);
 
-/**
- * Check a saved record before restoring it. Returns null for anything that
- * does not look like a page (nothing saved, another format, corrupted data),
- * so the editor starts on an empty page instead of crashing.
- */
-export function parseSavedPage(data: unknown): SavedPage | null {
-  if (!isObject(data) || data.version !== 1 || !isNumber(data.savedAt)) return null;
-  const page = data.page;
-  if (!isObject(page) || page.version !== 1) return null;
-  if (!isNumber(page.width) || !isNumber(page.height) || typeof page.background !== "string") return null;
-  if (!isNumber(page.margin) || !isNumber(page.gutter)) return null;
+function isPage(page: unknown): page is Page {
+  if (!isObject(page) || page.version !== 1) return false;
+  if (!isNumber(page.width) || !isNumber(page.height) || typeof page.background !== "string") return false;
+  if (!isNumber(page.margin) || !isNumber(page.gutter)) return false;
   for (const list of [page.panels, page.bubbles, page.sfx]) {
-    if (!Array.isArray(list)) return null;
+    if (!Array.isArray(list)) return false;
     if (!list.every((el) => isObject(el) && typeof el.id === "string" && isNumber(el.x) && isNumber(el.y) && isNumber(el.z))) {
-      return null;
+      return false;
     }
   }
-  return data as unknown as SavedPage;
+  return true;
+}
+
+/** Pages saved before step 11 have no id. */
+const withId = (page: Page): Page => (typeof page.id === "string" && page.id ? page : { ...page, id: nanoid(8) });
+
+/**
+ * Check a saved record before restoring it. Returns null for anything that
+ * does not look like a chapter (nothing saved, another format, corrupted
+ * data), so the editor starts on an empty page instead of crashing.
+ * A version 1 record (one page) becomes a one-page chapter.
+ */
+export function parseSavedPage(data: unknown): SavedPage | null {
+  if (!isObject(data) || !isNumber(data.savedAt)) return null;
+
+  if (data.version === 1) {
+    if (!isPage(data.page)) return null;
+    return { version: 2, savedAt: data.savedAt, chapter: { version: 1, pages: [withId(data.page)] }, currentPage: 0 };
+  }
+
+  if (data.version !== 2 || !isObject(data.chapter) || data.chapter.version !== 1) return null;
+  const pages = data.chapter.pages;
+  if (!Array.isArray(pages) || pages.length === 0 || !pages.every(isPage)) return null;
+  const currentPage = isNumber(data.currentPage) ? Math.max(0, Math.min(pages.length - 1, Math.round(data.currentPage))) : 0;
+  return { version: 2, savedAt: data.savedAt, chapter: { version: 1, pages: pages.map(withId) }, currentPage };
 }

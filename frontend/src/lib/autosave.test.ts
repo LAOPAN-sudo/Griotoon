@@ -10,7 +10,7 @@ function setup(storage: PageStorage = memoryPageStorage()) {
   const statuses: SaveStatus[] = [];
   const autosave = createAutosave({
     storage,
-    getPage: () => page,
+    getData: () => ({ chapter: { version: 1, pages: [page] }, currentPage: 0 }),
     subscribe: (l) => {
       listeners.add(l);
       return () => listeners.delete(l);
@@ -40,7 +40,7 @@ describe("autosave", () => {
     expect(save).not.toHaveBeenCalled();
     await vi.advanceTimersByTimeAsync(400);
     expect(save).toHaveBeenCalledTimes(1);
-    expect((storage.data as SavedPage).page.margin).toBe(20);
+    expect((storage.data as SavedPage).chapter.pages[0].margin).toBe(20);
     expect((storage.data as SavedPage).savedAt).toBe(1234);
     expect(statuses.at(-1)).toBe("saved");
   });
@@ -69,7 +69,7 @@ describe("autosave", () => {
       active++;
       expect(active).toBe(1);
       await new Promise<void>((r) => (release = r));
-      writes.push(record.page.margin);
+      writes.push(record.chapter.pages[0].margin);
       active--;
     });
     const { autosave, change, statuses } = setup(storage);
@@ -109,9 +109,23 @@ describe("autosave", () => {
 describe("parseSavedPage", () => {
   const record = (page: unknown) => ({ version: 1, savedAt: 1, page });
 
-  it("accepts a saved page", () => {
-    const page = createEmptyPage();
-    expect(parseSavedPage(record(page))?.page).toBe(page);
+  it("accepts a saved chapter and keeps the page being edited", () => {
+    const pages = [createEmptyPage(), createEmptyPage()];
+    const saved = parseSavedPage({ version: 2, savedAt: 5, chapter: { version: 1, pages }, currentPage: 1 });
+    expect(saved?.chapter.pages).toEqual(pages);
+    expect(saved?.currentPage).toBe(1);
+    // An out-of-range page index is clamped.
+    expect(parseSavedPage({ version: 2, savedAt: 5, chapter: { version: 1, pages }, currentPage: 9 })?.currentPage).toBe(1);
+  });
+
+  it("turns a one-page save from step 9 into a chapter, giving the page an id", () => {
+    const { id: _id, ...oldPage } = createEmptyPage();
+    void _id;
+    const saved = parseSavedPage(record(oldPage));
+    expect(saved?.version).toBe(2);
+    expect(saved?.chapter.pages).toHaveLength(1);
+    expect(saved?.chapter.pages[0].id).toEqual(expect.any(String));
+    expect(saved?.chapter.pages[0].margin).toBe(oldPage.margin);
   });
 
   it("rejects missing or damaged data", () => {
@@ -122,5 +136,7 @@ describe("parseSavedPage", () => {
     expect(parseSavedPage(record({ ...page, version: 2 }))).toBeNull();
     expect(parseSavedPage(record({ ...page, panels: null }))).toBeNull();
     expect(parseSavedPage(record({ ...page, bubbles: [{ id: "b", x: "1", y: 0, z: 0 }] }))).toBeNull();
+    expect(parseSavedPage({ version: 2, savedAt: 1, chapter: { version: 1, pages: [] }, currentPage: 0 })).toBeNull();
+    expect(parseSavedPage({ version: 2, savedAt: 1, chapter: { version: 1, pages: [page, { ...page, panels: 3 }] } })).toBeNull();
   });
 });

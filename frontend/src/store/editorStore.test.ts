@@ -440,3 +440,159 @@ describe("page settings and hidden elements", () => {
     expect(s().page.panels[0].hidden).toBe(true);
   });
 });
+
+describe("pages of the chapter", () => {
+  const ids = () => s().pages.map((p) => p.id);
+
+  it("starts with one page, which is the page being edited", () => {
+    expect(s().pages).toHaveLength(1);
+    expect(s().page).toBe(s().pages[0]);
+  });
+
+  it("edits only the current page", () => {
+    s().addPage();
+    s().addPanel();
+    expect(s().currentPage).toBe(1);
+    expect(s().pages[1].panels).toHaveLength(1);
+    expect(s().pages[0].panels).toHaveLength(0);
+    expect(s().page).toBe(s().pages[1]);
+  });
+
+  it("adds an empty page after the current one, with the same settings", () => {
+    s().updatePage({ background: "#FFF8E7", margin: 80 });
+    s().addPanel();
+    s().addPage();
+    expect(s().pages).toHaveLength(2);
+    expect(s().page).toMatchObject({ background: "#FFF8E7", margin: 80, panels: [] });
+    expect(s().page.id).not.toBe(s().pages[0].id);
+  });
+
+  it("duplicates a page right after it and shows the copy", () => {
+    s().addPanel();
+    s().addPage();
+    s().goToPage(0);
+    s().duplicatePage();
+    expect(s().pages).toHaveLength(3);
+    expect(s().currentPage).toBe(1);
+    expect(s().page.panels).toEqual(s().pages[0].panels);
+    expect(new Set(ids()).size).toBe(3);
+    // Editing the copy leaves the original untouched.
+    s().addPanel();
+    expect(s().pages[0].panels).toHaveLength(1);
+    expect(s().pages[1].panels).toHaveLength(2);
+  });
+
+  it("deletes a page but never the last one", () => {
+    s().removePage(0);
+    expect(s().pages).toHaveLength(1);
+    s().addPage();
+    s().addPage(); // pages: 0, 1, 2 — showing 2
+    const [a, b, c] = ids();
+    s().removePage(0);
+    expect(ids()).toEqual([b, c]);
+    expect(s().page.id).toBe(c); // still the same page
+    s().removePage(1); // the page being edited: its neighbour is shown
+    expect(ids()).toEqual([b]);
+    expect(s().currentPage).toBe(0);
+    void a;
+  });
+
+  it("moves a page and keeps editing the same one", () => {
+    s().addPage();
+    s().addPage();
+    const [a, b, c] = ids();
+    s().goToPage(0);
+    s().movePage(0, 2);
+    expect(ids()).toEqual([b, c, a]);
+    expect(s().currentPage).toBe(2);
+    expect(s().page.id).toBe(a);
+  });
+
+  it("changing page clears the selection and is not an undo step", () => {
+    s().addPage();
+    const steps = s().past.length;
+    s().select(s().addPanel());
+    s().goToPage(0);
+    expect(s().selectedIds).toEqual([]);
+    expect(s().past.length).toBe(steps + 1); // only the panel
+  });
+
+  it("undoes page operations and shows the page where the change happened", () => {
+    s().addPanel(); // on page 1
+    s().addPage();
+    s().addPage();
+    expect(s().pages).toHaveLength(3);
+    s().removePage(0);
+    expect(s().pages).toHaveLength(2);
+    s().undo();
+    expect(s().pages).toHaveLength(3);
+    expect(s().pages[0].panels).toHaveLength(1);
+    // Undo an edit on page 1 while page 3 is shown: page 1 comes back on screen.
+    s().goToPage(0);
+    s().addSfx();
+    s().goToPage(2);
+    s().undo();
+    expect(s().currentPage).toBe(0);
+    expect(s().page.sfx).toHaveLength(0);
+    s().redo();
+    expect(s().page.sfx).toHaveLength(1);
+  });
+
+  it("undo and redo of a new page show the page it concerns", () => {
+    s().addPage();
+    const added = s().page.id;
+    s().undo();
+    expect(s().pages).toHaveLength(1);
+    expect(s().currentPage).toBe(0);
+    s().redo();
+    expect(s().page.id).toBe(added);
+    expect(s().currentPage).toBe(1);
+    s().undo();
+    s().redo();
+    expect(s().currentPage).toBe(1);
+  });
+
+  it("ends a crop session before changing page", () => {
+    s().select(s().addPanel());
+    const id = s().selectedIds[0];
+    s().setPanelImage(id, { src: "data:x", width: 100, height: 100, offsetX: 0, offsetY: 0, scale: 2 });
+    s().startCrop(id);
+    s().updateCrop({ src: "data:x", width: 100, height: 100, offsetX: -10, offsetY: 0, scale: 2 });
+    s().addPage();
+    expect(s().crop).toBeNull();
+    expect(s().pages[0].panels[0].image?.offsetX).toBe(-10);
+  });
+
+  it("loads a chapter and returns it for saving", () => {
+    const pages = [createEmptyPage(), createEmptyPage()];
+    s().addPanel();
+    s().loadChapter({ version: 1, pages }, 1);
+    expect(s().page).toBe(pages[1]);
+    expect(s().past).toEqual([]);
+    expect(s().getChapter()).toEqual({ version: 1, pages });
+  });
+});
+
+describe("reset page", () => {
+  it("empties the current page only, keeps its settings, in one undo step", () => {
+    s().updatePage({ background: "#111111", margin: 90 });
+    s().addPanel();
+    s().addPage();
+    s().select([s().addPanel(), s().addBubble(), s().addSfx()]);
+    const steps = s().past.length;
+    s().resetPage();
+    expect(s().page).toMatchObject({ panels: [], bubbles: [], sfx: [], background: "#111111", margin: 90 });
+    expect(s().pages[0].panels).toHaveLength(1);
+    expect(s().selectedIds).toEqual([]);
+    expect(s().past.length).toBe(steps + 1);
+    s().undo();
+    expect(s().page.panels).toHaveLength(1);
+    expect(s().page.bubbles).toHaveLength(1);
+    expect(s().page.sfx).toHaveLength(1);
+  });
+
+  it("does nothing on an empty page", () => {
+    s().resetPage();
+    expect(s().past).toEqual([]);
+  });
+});

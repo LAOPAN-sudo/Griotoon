@@ -14,6 +14,8 @@ export function ExportMenu() {
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
+  const pageCount = useEditorStore((s) => s.pages.length);
+  const currentPage = useEditorStore((s) => s.currentPage);
 
   // Close on a click outside or on Escape.
   useEffect(() => {
@@ -36,18 +38,26 @@ export function ExportMenu() {
     setOpen(false);
     setBusy(true);
     const ui = useUiStore.getState();
-    const noticeId = ui.notify("info", "export.working");
+    ui.notify("info", "export.working");
     try {
-      // A bubble being edited hides its text on the canvas: save the text
-      // (blur) and close the editor, then wait for the canvas to redraw.
+      // Save a text being typed (blur) and a crop in progress, so the file
+      // matches what is on screen.
       (document.activeElement as HTMLElement | null)?.blur();
-      useEditorStore.getState().stopEditing();
+      const editor = useEditorStore.getState();
+      editor.stopEditing();
+      editor.endCrop();
       await nextFrame();
-      await nextFrame();
-      // Loaded on demand: Konva export code and jsPDF stay out of the first load.
-      const { exportPage } = await import("./exportCanvas");
-      await exportPage(useEditorStore.getState().page, format, t("export.fileBase"));
-      useUiStore.getState().dismissNotice(noticeId);
+      // Loaded on demand: the export code and jsPDF stay out of the first load.
+      const { exportChapterPdf, exportPagePng } = await import("./exportCanvas");
+      const { page, pages } = useEditorStore.getState();
+      if (format === "png") {
+        await exportPagePng(page, t("export.fileBase"));
+      } else {
+        await exportChapterPdf(pages, t("export.fileBase"), (n) => {
+          if (pages.length > 1) useUiStore.getState().notify("info", "export.workingPage", { n, total: pages.length });
+        });
+      }
+      useUiStore.getState().dismissNotice();
     } catch (error) {
       console.error(error);
       useUiStore.getState().notify("error", "export.error");
@@ -57,8 +67,8 @@ export function ExportMenu() {
   };
 
   const items: { format: ExportFormat; label: string; help: string }[] = [
-    { format: "png", label: t("export.png"), help: t("export.pngHelp") },
-    { format: "pdf", label: t("export.pdf"), help: t("export.pdfHelp") },
+    { format: "png", label: t("export.png"), help: t("export.pngHelp", { n: currentPage + 1 }) },
+    { format: "pdf", label: t("export.pdf"), help: t("export.pdfHelp", { count: pageCount }) },
   ];
 
   return (

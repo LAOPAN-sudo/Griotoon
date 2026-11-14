@@ -10,6 +10,22 @@ import { PANEL_FILL_DEFAULT } from "@/lib/page";
 // undo/redo) so a dataURL is decoded only once.
 const cache = new Map<string, HTMLImageElement>();
 
+/** Decode an image (or reuse the cached one). Used before drawing a page off screen. */
+export function loadImage(src: string): Promise<HTMLImageElement> {
+  let img = cache.get(src);
+  if (!img) {
+    img = new window.Image();
+    img.src = src;
+    cache.set(src, img);
+  }
+  const element = img;
+  if (element.complete && element.naturalWidth > 0) return Promise.resolve(element);
+  return new Promise((resolve, reject) => {
+    element.addEventListener("load", () => resolve(element), { once: true });
+    element.addEventListener("error", () => reject(new Error("Image could not be decoded")), { once: true });
+  });
+}
+
 export function useImageElement(src: string | undefined): HTMLImageElement | null {
   const [, forceRender] = useState(0);
   const cached = src ? cache.get(src) : undefined;

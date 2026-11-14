@@ -11,9 +11,9 @@ function isQuotaError(error: unknown): boolean {
 }
 
 /**
- * Restores the last page saved in this browser, then saves every change
+ * Restores the chapter saved in this browser, then saves every change
  * after a 1 s pause. Returns false until the restore is done: the canvas is
- * only shown afterwards, so an empty page can never overwrite a saved one.
+ * only shown afterwards, so an empty page can never overwrite a saved chapter.
  */
 export function useLocalSave(storage: PageStorage = idbPageStorage): boolean {
   const [ready, setReady] = useState(false);
@@ -33,15 +33,20 @@ export function useLocalSave(storage: PageStorage = idbPageStorage): boolean {
       // React may run this effect twice in development; only the last run applies.
       if (cancelled) return;
       if (saved) {
-        useEditorStore.getState().loadPage(saved.page);
+        useEditorStore.getState().loadChapter(saved.chapter, saved.currentPage);
         ui.setSaveStatus("saved", saved.savedAt);
       }
 
       let errorShown = false;
       const autosave = createAutosave({
         storage,
-        getPage: () => useEditorStore.getState().page,
-        subscribe: (listener) => useEditorStore.subscribe((s, prev) => s.page !== prev.page && listener()),
+        getData: () => {
+          const { getChapter, currentPage } = useEditorStore.getState();
+          return { chapter: getChapter(), currentPage };
+        },
+        // Any change to the pages, or another page shown (reopened on that page next time).
+        subscribe: (listener) =>
+          useEditorStore.subscribe((s, prev) => (s.pages !== prev.pages || s.currentPage !== prev.currentPage) && listener()),
         onStatus: (status, { savedAt, error }) => {
           useUiStore.getState().setSaveStatus(status, savedAt);
           if (status === "saved") errorShown = false;

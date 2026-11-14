@@ -12,6 +12,7 @@ export const PANEL_FILL_DEFAULT = "#FFFFFF";
 export function createEmptyPage(): Page {
   return {
     version: 1,
+    id: nanoid(8),
     width: PAGE_WIDTH,
     height: PAGE_HEIGHT,
     background: "#FFFFFF",

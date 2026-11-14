@@ -44,6 +44,12 @@ describe("matchShortcut", () => {
 });
 
 describe("help list", () => {
+  it("changes page with Page Up / Page Down", () => {
+    const k = (key: string) => matchShortcut({ key, ctrlKey: false, metaKey: false, shiftKey: false, altKey: false });
+    expect(k("PageDown")).toEqual({ type: "page", delta: 1 });
+    expect(k("PageUp")).toEqual({ type: "page", delta: -1 });
+  });
+
   it("maps ? to the help dialog", () => {
     expect(key("?", { shift: true })).toEqual({ type: "help" });
   });
@@ -56,6 +62,8 @@ describe("help list", () => {
       "keys.delete": "Delete",
       "keys.backspace": "Backspace",
       "keys.arrows": "ArrowLeft",
+      "keys.pageDown": "PageDown",
+      "keys.pageUp": "PageUp",
     };
     const mouse = ["keys.click", "keys.doubleClick", "keys.drag", "keys.wheel", "keys.space"];
     let checked = 0;
@@ -63,6 +71,8 @@ describe("help list", () => {
       for (const item of group.items) {
         for (const combo of item.combos) {
           if (combo.some((k) => mouse.includes(k))) continue;
+          // Alt + arrows moves a page or a layer from the focused list, not a global shortcut.
+          if (combo.includes("keys.alt")) continue;
           const main = combo.find((k) => k !== "keys.ctrl" && k !== "keys.shift")!;
           const action = matchShortcut({
             key: named[main] ?? main,

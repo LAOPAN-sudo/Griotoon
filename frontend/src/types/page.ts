@@ -74,6 +74,8 @@ export interface Sfx {
 
 export interface Page {
   version: 1;
+  /** Stable id (thumbnails, reordering, later the database row). */
+  id: string;
   width: number;
   height: number;
   background: string;
@@ -86,3 +88,9 @@ export interface Page {
 
 /** Any element that can be selected, reordered or deleted on a page. */
 export type PageElement = Panel | Bubble | Sfx;
+
+/** A chapter: ordered pages. Phase 1 edits one chapter, saved in the browser. */
+export interface Chapter {
+  version: 1;
+  pages: Page[];
+}

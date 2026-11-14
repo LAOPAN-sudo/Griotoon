@@ -21,7 +21,6 @@ import { useT } from "@/i18n";
 import type { Bubble, Panel, Sfx } from "@/types/page";
 import { useSpaceKey } from "./useSpaceKey";
 import { PanelNode, useImageElement } from "./PanelNode";
-import { registerStage } from "./stageRegistry";
 import { importImageIntoPanel, openImagePicker } from "./imageImport";
 import { BubbleNode } from "./BubbleNode";
 import { TextEditor } from "./TextEditor";
@@ -70,12 +69,6 @@ export default function EditorCanvas() {
 
   const [isPanning, setIsPanning] = useState(false);
 
-  // Give the export access to the stage (it is mounted once the viewport is measured).
-  const stageMounted = viewport.width > 0 && viewport.height > 0;
-  useEffect(() => {
-    registerStage(stageMounted ? stageRef.current : null);
-    return () => registerStage(null);
-  }, [stageMounted]);
   const [guides, setGuides] = useState<Guides>({});
   const [draft, setDraft] = useState<{ start: Point; end: Point } | null>(null);
   /** Panel under a file being dragged from the computer. */
