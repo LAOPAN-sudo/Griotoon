@@ -192,6 +192,14 @@ export const en: Messages = {
   "keys.drag": "Drag",
   "keys.wheel": "Wheel",
 
+  "save.saving": "Saving…",
+  "save.saved": "Saved ✓",
+  "save.savedHelp": "Saved in this browser at {time}",
+  "save.failed": "Not saved",
+  "save.failedHelp": "The page could not be saved in this browser. It will retry on the next change.",
+  "save.error": "The page could not be saved in this browser.",
+  "save.errorQuota": "The browser storage is full: the page is not saved. Remove or replace some images, or free up space.",
+
   "common.cancel": "Cancel",
   "common.close": "Close",
   "color.hex": "Colour code (hexadecimal)",

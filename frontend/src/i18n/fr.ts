@@ -194,6 +194,14 @@ export const fr = {
   "keys.drag": "Glisser",
   "keys.wheel": "Molette",
 
+  "save.saving": "Enregistrement…",
+  "save.saved": "Enregistré ✓",
+  "save.savedHelp": "Enregistré dans ce navigateur à {time}",
+  "save.failed": "Non enregistré",
+  "save.failedHelp": "La planche n'a pas pu être enregistrée dans ce navigateur. Nouvel essai à la prochaine modification.",
+  "save.error": "La planche n'a pas pu être enregistrée dans ce navigateur.",
+  "save.errorQuota": "Le stockage du navigateur est plein : la planche n'est pas enregistrée. Retire ou remplace des images, ou libère de l'espace.",
+
   "common.cancel": "Annuler",
   "common.close": "Fermer",
   "color.hex": "Code couleur (hexadécimal)",

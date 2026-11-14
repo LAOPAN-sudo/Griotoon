@@ -25,6 +25,8 @@ src/
 │   ├── LocaleSync.tsx   # restaure la langue choisie, met à jour <html lang>
 │   └── ui/              # boutons, sélecteur de langue…
 ├── i18n/                # traductions : fr.ts (référence), en.ts, useT()
+├── lib/pageStorage.ts   # sauvegarde locale dans IndexedDB (idb-keyval), vérification avant restauration
+├── lib/autosave.ts      # sauvegarde automatique : délai de 1 s, écriture immédiate quand l'onglet est caché
 ├── lib/page.ts          # page vide et éléments par défaut (case, bulle, onomatopée)
 ├── lib/bubbles.ts       # formes des bulles (fonctions pures → tracé), zone de texte
 ├── lib/sfx.ts           # onomatopées : tailles, contour, couleurs
@@ -48,6 +50,7 @@ Organisation cible complète : `../docs/03-architecture.md`.
 
 - **Traductions** : aucun texte d'interface en dur dans les composants. On ajoute la clé dans `src/i18n/fr.ts` **et** dans `src/i18n/en.ts` (sinon TypeScript refuse de compiler), puis on l'utilise avec `const t = useT(); t("ma.cle")`. Paramètres : `t("home.phase", { phase: 1 })` pour `"Phase {phase}"`.
 - **Store** : toute modification de la page passe par les actions de `editorStore` (jamais de mutation directe des objets Konva). Chaque action crée une étape d'historique ; la sélection n'en crée pas.
+- **Sauvegarde locale** : la page est enregistrée dans IndexedDB 1 s après chaque modification (`useLocalSave`). Le canvas n'apparaît qu'une fois la dernière page restaurée, pour qu'une page vide n'écrase jamais une sauvegarde. Pour repartir de zéro en dev : outils de développement du navigateur → Application → IndexedDB → supprimer `keyval-store`.
 - **Raccourcis clavier** : un nouveau raccourci s'ajoute à deux endroits de `src/lib/shortcuts.ts` : dans `matchShortcut` (ce qu'il fait) et dans `SHORTCUT_GROUPS` (la fenêtre « Raccourcis clavier », touche `?`). Un test vérifie que chaque raccourci affiché existe vraiment.
 - **Images** : compressées dans le navigateur (WebP, 2000 px max) puis stockées en dataURL dans le JSON de la page (phase 1, décision n° 9). Une image couvre toujours sa case : `clampCrop` corrige le recadrage après chaque déplacement, zoom ou redimensionnement.
 - **Bulles** : le contour vient de `bubblePath` (liste de tracés, testable), rejoué par Konva. Les bulles pivotent comme les cases. La pointe (`tail`) est en coordonnées de page : `tailToLocal` la ramène dans le repère tourné de la bulle pour le dessin, et `transformTail` la recalcule après un déplacement, une rotation ou un redimensionnement. Le texte s'édite dans un `<textarea>` HTML posé sur la bulle (`BubbleTextEditor`), à la même police et au même zoom. Le JSON garde le nom de police (« Comic Neue ») ; `canvasFontFamily` le traduit en police réelle chargée par next/font.

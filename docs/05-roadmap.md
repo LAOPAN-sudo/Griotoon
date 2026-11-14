@@ -17,7 +17,7 @@ Objectif : un éditeur utilisable pour monter une planche avec ses propres image
 - [x] Bulles : 4 types, texte éditable, pointe déplaçable
 - [x] Onomatopées (texte stylisé, rotation)
 - [x] Panneau des calques (ordre z, suppression)
-- [ ] Sauvegarde locale automatique (IndexedDB) et restauration
+- [x] Sauvegarde locale automatique (IndexedDB) et restauration
 - [ ] Export PNG de la page
 - [ ] Export PDF (plusieurs pages)
 - [ ] Gestion de plusieurs pages dans un chapitre (miniatures, ajout, réordonnancement)

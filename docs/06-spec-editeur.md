@@ -87,6 +87,7 @@ Le choix d'un gabarit remplace les cases existantes après confirmation (« Remp
 ### Étape 9 : sauvegarde locale
 - Sauvegarde automatique avec un délai de 1 s après chaque modification, dans IndexedDB (`idb-keyval`).
 - Au chargement : restaurer le dernier état. Indicateur « Enregistré ✓ / Enregistrement… ».
+- Mise en œuvre : clé unique `griotoon:current-page` (une seule page en phase 1 ; l'étape 11 passera au chapitre). Les données sont vérifiées avant restauration (sinon page vide). Le canvas n'apparaît qu'après la restauration. Écriture immédiate quand l'onglet est caché ou fermé. En cas d'échec (stockage plein…), l'indicateur affiche « Non enregistré », un message explique la cause et la fermeture de l'onglet demande confirmation.
 
 ### Étape 10 : export
 - **PNG** : `stage.toDataURL({ pixelRatio })` sur la page seule (sans l'interface ni le Transformer), à la taille réelle 1240 × 1754.

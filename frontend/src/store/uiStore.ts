@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import type { MessageKey } from "@/i18n/fr";
+import type { SaveStatus } from "@/lib/autosave";
 
 // Interface state shared between components (open panels, dialogs, notices…).
 // Not part of the page, not in the undo history.
@@ -19,6 +20,11 @@ interface UiState {
   sidebarOpen: boolean;
   setSidebarOpen: (open: boolean) => void;
 
+  /** Local save (IndexedDB): state shown in the header, time of the last successful save. */
+  saveStatus: SaveStatus;
+  lastSavedAt: number | null;
+  setSaveStatus: (status: SaveStatus, savedAt?: number) => void;
+
   /** Short message shown at the bottom of the screen (errors, progress). */
   notice: Notice | null;
   notify: (kind: Notice["kind"], messageKey: MessageKey, params?: Notice["params"]) => number;
@@ -34,6 +40,11 @@ export const useUiStore = create<UiState>()((set, get) => ({
 
   sidebarOpen: true,
   setSidebarOpen: (sidebarOpen) => set({ sidebarOpen }),
+
+  saveStatus: "idle",
+  lastSavedAt: null,
+  setSaveStatus: (saveStatus, savedAt) =>
+    set((s) => ({ saveStatus, lastSavedAt: savedAt ?? s.lastSavedAt })),
 
   notice: null,
   notify: (kind, messageKey, params) => {

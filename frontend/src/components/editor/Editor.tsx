@@ -13,6 +13,8 @@ import { ImagePicker } from "./ImagePicker";
 import { Toast } from "@/components/ui/Toast";
 import { Toolbar } from "./Toolbar";
 import { ZoomControls } from "./ZoomControls";
+import { SaveIndicator } from "./SaveIndicator";
+import { useLocalSave } from "./useLocalSave";
 
 function CanvasLoading() {
   const t = useT();
@@ -31,6 +33,8 @@ const EditorCanvas = dynamic(() => import("./EditorCanvas"), {
 
 export function Editor() {
   const t = useT();
+  // The canvas waits for the last saved page to be restored.
+  const ready = useLocalSave();
 
   return (
     <div className="flex h-dvh flex-col overflow-hidden">
@@ -49,6 +53,7 @@ export function Editor() {
           </Link>
           <span className="text-sm text-zinc-500">{t("editor.title")}</span>
           <HistoryControls />
+          <SaveIndicator />
         </div>
         <div className="flex items-center gap-4">
           <ZoomControls />
@@ -61,7 +66,7 @@ export function Editor() {
       <div className="flex min-h-0 flex-1">
         <Toolbar />
         <main className="relative flex-1 bg-zinc-200">
-          <EditorCanvas />
+          {ready ? <EditorCanvas /> : <CanvasLoading />}
           <CropBar />
         </main>
         <Sidebar />
