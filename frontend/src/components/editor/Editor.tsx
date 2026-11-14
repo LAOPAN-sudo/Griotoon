@@ -4,6 +4,8 @@ import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useT } from "@/i18n";
 import { LanguageSwitcher } from "@/components/ui/LanguageSwitcher";
+import { HistoryControls } from "./HistoryControls";
+import { Toolbar } from "./Toolbar";
 import { ZoomControls } from "./ZoomControls";
 
 function CanvasLoading() {
@@ -36,6 +38,7 @@ export function Editor() {
             {t("app.name")}
           </Link>
           <span className="text-sm text-zinc-500">{t("editor.title")}</span>
+          <HistoryControls />
         </div>
         <div className="flex items-center gap-4">
           <ZoomControls />
@@ -43,12 +46,15 @@ export function Editor() {
         </div>
       </header>
 
-      <main className="relative flex-1 bg-zinc-200">
-        <EditorCanvas />
-        <p className="pointer-events-none absolute bottom-2 left-3 rounded bg-white/80 px-2 py-1 text-xs text-zinc-600">
-          {t("editor.navigationHint")}
-        </p>
-      </main>
+      <div className="flex min-h-0 flex-1">
+        <Toolbar />
+        <main className="relative flex-1 bg-zinc-200">
+          <EditorCanvas />
+          <p className="pointer-events-none absolute bottom-2 left-3 rounded bg-white/80 px-2 py-1 text-xs text-zinc-600">
+            {t("editor.navigationHint")}
+          </p>
+        </main>
+      </div>
     </div>
   );
 }

@@ -11,7 +11,7 @@ Objectif : un éditeur utilisable pour monter une planche avec ses propres image
 - [x] Interface bilingue français / anglais : dictionnaires `fr` et `en`, sélecteur de langue, choix mémorisé (français par défaut)
 - [x] Types `Page`, `Panel`, `Bubble`, `Sfx` + store Zustand avec annuler/rétablir
 - [x] Canvas : affichage d'une page A4 à l'échelle, zoom et déplacement de la vue
-- [ ] Gabarits de découpage (au moins 6) appliqués à une page vide
+- [x] Gabarits de découpage (au moins 6) appliqués à une page vide
 - [ ] Sélection, déplacement et redimensionnement des cases (Transformer de Konva)
 - [ ] Import d'une image dans une case (glisser-déposer ou bouton) + recadrage
 - [ ] Bulles : 4 types, texte éditable, pointe déplaçable

@@ -93,6 +93,24 @@ describe("templates and ordering", () => {
     expect(s().page.bubbles[0].panelId).toBeUndefined();
   });
 
+  it("puts template panels below existing bubbles and sfx", () => {
+    s().addBubble(); // z 0
+    s().addSfx(); // z 1
+    const page = s().page;
+    s().applyTemplate([createPanel(page), createPanel(page), createPanel(page)]);
+    expect(s().page.panels.map((p) => p.z)).toEqual([0, 1, 2]);
+    expect(s().page.bubbles[0].z).toBe(3);
+    expect(s().page.sfx[0].z).toBe(4);
+  });
+
+  it("can undo a template in one step", () => {
+    s().addPanel({ x: 1 });
+    const page = s().page;
+    s().applyTemplate([createPanel(page), createPanel(page)]);
+    s().undo();
+    expect(s().page.panels.map((p) => p.x)).toEqual([1]);
+  });
+
   it("reorders z from a list of ids, bottom first", () => {
     const a = s().addPanel();
     const b = s().addBubble();

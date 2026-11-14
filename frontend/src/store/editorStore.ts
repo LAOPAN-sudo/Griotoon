@@ -127,7 +127,13 @@ export const editorStateCreator: StateCreator<EditorState> = (set, get) => {
     applyTemplate: (panels) => {
       const oldIds = new Set(get().page.panels.map((p) => p.id));
       commit((d) => {
-        d.panels = panels;
+        // New panels go below everything else, in template order; the other
+        // elements keep their relative order on top.
+        d.panels = panels.map((p, index) => ({ ...p, z: index }));
+        const others = [...d.bubbles, ...d.sfx].sort((a, b) => a.z - b.z);
+        others.forEach((el, index) => {
+          el.z = panels.length + index;
+        });
         for (const b of d.bubbles) {
           if (b.panelId && oldIds.has(b.panelId)) delete b.panelId;
         }
