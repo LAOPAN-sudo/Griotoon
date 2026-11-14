@@ -69,10 +69,13 @@ Le choix d'un gabarit remplace les cases existantes après confirmation (« Remp
   - **narration** : rectangle, sans pointe
 - Texte centré, retour à la ligne automatique dans la bulle. Double-clic pour éditer (textarea HTML superposée au canvas).
 - Poignée sur la pointe pour la déplacer.
+- Les bulles pivotent comme les cases et les onomatopées (poignée de rotation). La pointe reste en coordonnées de page : elle est convertie dans le repère de la bulle pour le dessin.
 - Polices libres de droits : **Comic Neue** pour les bulles, **Bangers** pour les onomatopées (Google Fonts, chargées via `next/font`).
 
 ### Étape 7 : onomatopées
-- Texte en grand, avec contour (`stroke`), couleur et rotation libres.
+- Texte en grand (police Bangers), avec contour (`strokeColor`, épaisseur proportionnelle à la taille), couleur et rotation libres.
+- Outil Onomatopée (touche O) : un clic place « BAM ! » et ouvre la saisie (le texte est sélectionné, on tape directement le sien). Une onomatopée vidée de son texte est supprimée.
+- Redimensionnement par les coins uniquement (proportions gardées) : la taille de police suit.
 
 ### Étape 8 : calques et propriétés
 - Liste de tous les éléments triés par `z`, avec glisser pour réordonner, une icône œil (masquer) et une corbeille.

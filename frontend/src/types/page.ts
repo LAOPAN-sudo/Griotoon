@@ -39,7 +39,9 @@ export interface Bubble {
   y: number;
   w: number;
   h: number;
-  /** Tail tip position. Absent for narration boxes. */
+  /** Degrees, around the (x, y) corner as in Konva. */
+  rotation: number;
+  /** Tail tip position, in page coordinates. Absent for narration boxes. */
   tail?: { x: number; y: number };
   text: string;
   fontFamily: string;
@@ -52,11 +54,15 @@ export interface Bubble {
 export interface Sfx {
   id: string;
   text: string;
+  /** Top-left corner, also the rotation centre (as in Konva). */
   x: number;
   y: number;
   fontSize: number;
   rotation: number;
+  /** Text colour. */
   color: string;
+  /** Outline colour; its thickness follows fontSize (see lib/sfx.ts). */
+  strokeColor: string;
   z: number;
 }
 

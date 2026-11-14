@@ -20,12 +20,13 @@ npm run build        # build de production
 src/
 ├── app/                 # routes Next.js (App Router) : / et /editeur
 ├── components/
-│   ├── editor/          # éditeur : Editor, EditorCanvas (Konva), PanelNode, BubbleNode, barres flottantes…
+│   ├── editor/          # éditeur : Editor, EditorCanvas (Konva), PanelNode, BubbleNode, SfxNode, TextEditor, barres flottantes…
 │   ├── LocaleSync.tsx   # restaure la langue choisie, met à jour <html lang>
 │   └── ui/              # boutons, sélecteur de langue…
 ├── i18n/                # traductions : fr.ts (référence), en.ts, useT()
 ├── lib/page.ts          # page vide et éléments par défaut (case, bulle, onomatopée)
 ├── lib/bubbles.ts       # formes des bulles (fonctions pures → tracé), zone de texte
+├── lib/sfx.ts           # onomatopées : tailles, contour, couleurs
 ├── lib/geometry.ts      # boîtes englobantes, rectangle tracé, case sous un point
 ├── lib/image.ts         # compression WebP à l'import, calculs de recadrage
 ├── lib/snapping.ts      # aimantation (bords de page, marges, autres cases, gouttière)
@@ -46,7 +47,8 @@ Organisation cible complète : `../docs/03-architecture.md`.
 - **Store** : toute modification de la page passe par les actions de `editorStore` (jamais de mutation directe des objets Konva). Chaque action crée une étape d'historique ; la sélection n'en crée pas.
 - **Raccourcis clavier** : un nouveau raccourci s'ajoute à deux endroits de `src/lib/shortcuts.ts` : dans `matchShortcut` (ce qu'il fait) et dans `SHORTCUT_GROUPS` (la fenêtre « Raccourcis clavier », touche `?`). Un test vérifie que chaque raccourci affiché existe vraiment.
 - **Images** : compressées dans le navigateur (WebP, 2000 px max) puis stockées en dataURL dans le JSON de la page (phase 1, décision n° 9). Une image couvre toujours sa case : `clampCrop` corrige le recadrage après chaque déplacement, zoom ou redimensionnement.
-- **Bulles** : le contour vient de `bubblePath` (liste de tracés, testable), rejoué par Konva. La pointe (`tail`) est en coordonnées de page et suit la bulle. Le texte s'édite dans un `<textarea>` HTML posé sur la bulle (`BubbleTextEditor`), à la même police et au même zoom. Le JSON garde le nom de police (« Comic Neue ») ; `canvasFontFamily` le traduit en police réelle chargée par next/font.
+- **Bulles** : le contour vient de `bubblePath` (liste de tracés, testable), rejoué par Konva. Les bulles pivotent comme les cases. La pointe (`tail`) est en coordonnées de page : `tailToLocal` la ramène dans le repère tourné de la bulle pour le dessin, et `transformTail` la recalcule après un déplacement, une rotation ou un redimensionnement. Le texte s'édite dans un `<textarea>` HTML posé sur la bulle (`BubbleTextEditor`), à la même police et au même zoom. Le JSON garde le nom de police (« Comic Neue ») ; `canvasFontFamily` le traduit en police réelle chargée par next/font.
+- **Onomatopées** : texte Bangers avec contour dessiné derrière le remplissage. Redimensionnées par les coins seulement ; l'échelle est convertie en `fontSize` à la fin du geste (l'épaisseur du contour suit). Le même `TextEditor` sert à la saisie des bulles et des onomatopées.
 - **Canvas** : react-konva utilise le canvas du navigateur. Les composants de l'éditeur sont des composants client (`'use client'`) chargés via `next/dynamic` avec `{ ssr: false }`.
 - **Polices** : Geist (interface), Comic Neue (bulles, classe `font-comic`), Bangers (onomatopées, classe `font-bangers`), chargées via `next/font/google` dans `src/app/layout.tsx`.
 - Cette version de Next.js (16) diffère des anciennes : consulter `node_modules/next/dist/docs/` en cas de doute (voir `AGENTS.md`).

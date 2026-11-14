@@ -15,7 +15,7 @@ Objectif : un éditeur utilisable pour monter une planche avec ses propres image
 - [x] Sélection, déplacement et redimensionnement des cases (Transformer de Konva)
 - [x] Import d'une image dans une case (glisser-déposer ou bouton) + recadrage
 - [x] Bulles : 4 types, texte éditable, pointe déplaçable
-- [ ] Onomatopées (texte stylisé, rotation)
+- [x] Onomatopées (texte stylisé, rotation)
 - [ ] Panneau des calques (ordre z, suppression)
 - [ ] Sauvegarde locale automatique (IndexedDB) et restauration
 - [ ] Export PNG de la page

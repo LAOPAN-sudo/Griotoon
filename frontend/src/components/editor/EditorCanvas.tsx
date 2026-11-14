@@ -12,25 +12,27 @@ import { useEditorStore, type ElementPatch } from "@/store/editorStore";
 import { useViewStore } from "@/store/viewStore";
 import { useUiStore } from "@/store/uiStore";
 import { wheelDeltaPixels, wheelZoomFactor } from "@/lib/viewport";
-import { boundsOf, rectFromPoints, toLocal, topmostAt, type Box } from "@/lib/geometry";
+import { boundsOf, centerOf, rectFromPoints, toLocal, topmostAt, type Box } from "@/lib/geometry";
 import { buildSnapTargets, snapBox, snapPoint, SNAP_TOLERANCE_PX, type Guides } from "@/lib/snapping";
 import { clampCrop, zoomCrop } from "@/lib/image";
-import { canvasFontFamily, DEFAULT_BUBBLE_SIZE, defaultTail } from "@/lib/bubbles";
+import { canvasFontFamily, DEFAULT_BUBBLE_SIZE, defaultTail, transformTail } from "@/lib/bubbles";
+import { clampSfxFontSize, DEFAULT_SFX_FONT_SIZE, DEFAULT_SFX_TEXT, SFX_FONT } from "@/lib/sfx";
 import { useT } from "@/i18n";
-import type { Bubble, Panel } from "@/types/page";
+import type { Bubble, Panel, Sfx } from "@/types/page";
 import { useSpaceKey } from "./useSpaceKey";
 import { PanelNode, useImageElement } from "./PanelNode";
 import { importImageIntoPanel, openImagePicker } from "./imageImport";
 import { BubbleNode } from "./BubbleNode";
-import { BubbleTextEditor } from "./BubbleTextEditor";
+import { TextEditor } from "./TextEditor";
+import { SfxNode } from "./SfxNode";
 
 /** Wait for the comic fonts before drawing text on the canvas (Konva can't redraw by itself when they arrive). */
 function useComicFonts() {
-  const [fonts, setFonts] = useState<{ ready: boolean; comic: string }>({ ready: false, comic: "Comic Neue" });
+  const [fonts, setFonts] = useState({ ready: false, comic: "Comic Neue", bangers: SFX_FONT });
   useEffect(() => {
     const comic = canvasFontFamily("Comic Neue");
-    const bangers = canvasFontFamily("Bangers");
-    const done = () => setFonts({ ready: true, comic });
+    const bangers = canvasFontFamily(SFX_FONT);
+    const done = () => setFonts({ ready: true, comic, bangers });
     if (!document.fonts) return done();
     Promise.all([document.fonts.load(`28px ${comic}`), document.fonts.load(`28px ${bangers}`)]).then(done, done);
   }, []);
@@ -137,13 +139,22 @@ export default function EditorCanvas() {
   // --------------------------------------------------------------- selection
 
   const panels = useMemo(() => [...page.panels].sort((a, b) => a.z - b.z), [page.panels]);
-  const bubbles = useMemo(() => [...page.bubbles].sort((a, b) => a.z - b.z), [page.bubbles]);
+  /** Bubbles and sound effects share a layer, stacked by z. */
+  const texts = useMemo(
+    () =>
+      [
+        ...page.bubbles.map((b) => ({ kind: "bubble" as const, el: b })),
+        ...page.sfx.map((x) => ({ kind: "sfx" as const, el: x })),
+      ].sort((a, b) => a.el.z - b.el.z),
+    [page.bubbles, page.sfx],
+  );
   /** Selected elements that have a Konva node the Transformer can hold. */
   const selectedNodeIds = useMemo(() => {
-    const ids = new Set([...page.panels, ...page.bubbles].map((el) => el.id));
+    const ids = new Set([...page.panels, ...page.bubbles, ...page.sfx].map((el) => el.id));
     return selectedIds.filter((id) => ids.has(id));
-  }, [page.panels, page.bubbles, selectedIds]);
-  const selectionHasBubble = selectedIds.some((id) => page.bubbles.some((b) => b.id === id));
+  }, [page.panels, page.bubbles, page.sfx, selectedIds]);
+  /** Sound effects resize from the corners only, keeping their proportions (the font size follows). */
+  const selectionHasSfx = selectedIds.some((id) => page.sfx.some((x) => x.id === id));
   /** The single selected bubble, if any (gets a tail handle). */
   const soloBubble: Bubble | undefined =
     selectedIds.length === 1 ? page.bubbles.find((b) => b.id === selectedIds[0]) : undefined;
@@ -158,7 +169,7 @@ export default function EditorCanvas() {
       .filter((n): n is Konva.Node => !!n);
     transformer.nodes(nodes);
     transformer.getLayer()?.batchDraw();
-  }, [selectedNodeIds, page.panels, page.bubbles, crop]);
+  }, [selectedNodeIds, page.panels, page.bubbles, page.sfx, crop]);
 
   const canEdit = tool === "select" && !spacePressed && !crop;
 
@@ -227,7 +238,7 @@ export default function EditorCanvas() {
       // A bubble carries its tail along, and remembers the panel it now sits on.
       const dx = x - bubble.x;
       const dy = y - bubble.y;
-      const center = { x: x + bubble.w / 2, y: y + bubble.h / 2 };
+      const center = centerOf({ ...bubble, x, y });
       return {
         id: bubble.id,
         patch: {
@@ -250,26 +261,40 @@ export default function EditorCanvas() {
     const { page, updateElements } = useEditorStore.getState();
     const nodes = transformerRef.current?.nodes() ?? [];
     const patches = nodes.flatMap((node): { id: string; patch: ElementPatch }[] => {
+      const sfx = page.sfx.find((x) => x.id === node.id());
+      if (sfx) {
+        // Bake the (uniform) scale into the font size.
+        const scale = (Math.abs(node.scaleX()) + Math.abs(node.scaleY())) / 2;
+        const patch = {
+          x: px(node.x()),
+          y: px(node.y()),
+          rotation: deg(node.rotation()),
+          fontSize: clampSfxFontSize(sfx.fontSize * scale),
+        };
+        node.setAttrs({ x: patch.x, y: patch.y, rotation: patch.rotation, scaleX: 1, scaleY: 1 });
+        return [{ id: sfx.id, patch }];
+      }
       const bubble = page.bubbles.find((b) => b.id === node.id());
       if (bubble) {
         const sx = node.scaleX();
         const sy = node.scaleY();
         const x = px(node.x());
         const y = px(node.y());
-        node.setAttrs({ x, y, scaleX: 1, scaleY: 1 });
+        const rotation = deg(node.rotation());
+        node.setAttrs({ x, y, rotation, scaleX: 1, scaleY: 1 });
+        // The tail was moved, rotated and stretched with the bubble on screen:
+        // keep it where it was shown.
+        const tail = transformTail(bubble, { x, y, rotation }, sx, sy);
         return [
           {
             id: bubble.id,
             patch: {
               x,
               y,
+              rotation,
               w: px(Math.max(MIN_PANEL_SIZE, bubble.w * sx)),
               h: px(Math.max(MIN_PANEL_SIZE, bubble.h * sy)),
-              // The tail was stretched with the bubble on screen: keep it where it was shown.
-              tail: bubble.tail && {
-                x: px(x + (bubble.tail.x - bubble.x) * sx),
-                y: px(y + (bubble.tail.y - bubble.y) * sy),
-              },
+              tail: tail && { x: px(tail.x), y: px(tail.y) },
             },
           },
         ];
@@ -316,6 +341,11 @@ export default function EditorCanvas() {
       if (p) placeBubble(p);
       return;
     }
+    if (tool === "sfx") {
+      const p = pointerOnPage();
+      if (p) placeSfx(p);
+      return;
+    }
     if (tool === "panel") {
       const p = pointerOnPage();
       if (!p) return;
@@ -352,6 +382,19 @@ export default function EditorCanvas() {
       panelId: topmostAt(store.page.panels, p)?.id,
     });
     store.startEditing(id); // also selects it and goes back to the Select tool
+  };
+
+  /** Sfx tool: a click places "BAM !" centred on the pointer, text selected for typing. */
+  const placeSfx = (p: Point) => {
+    const store = useEditorStore.getState();
+    const size = DEFAULT_SFX_FONT_SIZE;
+    const id = store.addSfx({
+      x: px(p.x - size * DEFAULT_SFX_TEXT.length * 0.22),
+      y: px(p.y - size / 2),
+      fontSize: size,
+      rotation: -8,
+    });
+    store.startEditing(id);
   };
 
   const finishDrawing = () => {
@@ -450,7 +493,7 @@ export default function EditorCanvas() {
     ? "grabbing"
     : spacePressed
       ? "grab"
-      : tool === "panel" || tool === "bubble"
+      : tool === "panel" || tool === "bubble" || tool === "sfx"
         ? "crosshair"
         : "default";
 
@@ -523,19 +566,21 @@ export default function EditorCanvas() {
 
           {/* Re-created once the fonts are loaded, so the text is measured with the right font. */}
           <Layer name="bubblesLayer" key={fonts.ready ? "fonts-ready" : "fonts-loading"}>
-            {bubbles.map((bubble) => (
-              <BubbleNode
-                key={bubble.id}
-                bubble={bubble}
-                fontFamily={fonts.comic}
-                editing={editingId === bubble.id}
-                listening={tool === "select" && !crop}
-                draggable={canEdit && editingId !== bubble.id}
-                onPointerDown={(e) => onElementPointerDown(bubble.id, e)}
-                onDragEnd={onElementDragEnd}
-                onDblClick={() => useEditorStore.getState().startEditing(bubble.id)}
-              />
-            ))}
+            {texts.map(({ kind, el }) => {
+              const common = {
+                editing: editingId === el.id,
+                listening: tool === "select" && !crop,
+                draggable: canEdit && editingId !== el.id,
+                onPointerDown: (e: Konva.KonvaEventObject<PointerEvent>) => onElementPointerDown(el.id, e),
+                onDragEnd: onElementDragEnd,
+                onDblClick: () => useEditorStore.getState().startEditing(el.id),
+              };
+              return kind === "bubble" ? (
+                <BubbleNode key={el.id} bubble={el as Bubble} fontFamily={fonts.comic} {...common} />
+              ) : (
+                <SfxNode key={el.id} sfx={el as Sfx} fontFamily={fonts.bangers} {...common} />
+              );
+            })}
           </Layer>
 
           <Layer name="uiLayer">
@@ -642,10 +687,14 @@ export default function EditorCanvas() {
             <Transformer
               ref={transformerRef}
               visible={tool === "select" && !crop}
-              rotateEnabled={!selectionHasBubble}
               ignoreStroke
               flipEnabled={false}
-              keepRatio={false}
+              keepRatio={selectionHasSfx}
+              enabledAnchors={
+                selectionHasSfx
+                  ? ["top-left", "top-right", "bottom-left", "bottom-right"]
+                  : undefined
+              }
               rotationSnaps={[0, 90, 180, 270]}
               rotationSnapTolerance={4}
               rotateAnchorOffset={24}
@@ -655,7 +704,8 @@ export default function EditorCanvas() {
               borderStroke={SELECTION_COLOR}
               anchorDragBoundFunc={anchorDragBound}
               boundBoxFunc={(oldBox, newBox) => {
-                const min = MIN_PANEL_SIZE * useViewStore.getState().view.scale;
+                // (Sound effects can be smaller than panels.)
+                const min = (selectionHasSfx ? 12 : MIN_PANEL_SIZE) * useViewStore.getState().view.scale;
                 return Math.abs(newBox.width) < min || Math.abs(newBox.height) < min ? oldBox : newBox;
               }}
               onTransformEnd={onTransformEnd}
@@ -663,7 +713,7 @@ export default function EditorCanvas() {
           </Layer>
         </Stage>
       )}
-      <BubbleTextEditor />
+      <TextEditor />
     </div>
   );
 }

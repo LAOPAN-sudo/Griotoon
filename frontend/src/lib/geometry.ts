@@ -56,6 +56,20 @@ export function toLocal(r: Rotatable, point: { x: number; y: number }): { x: num
   return { x: dx * Math.cos(a) - dy * Math.sin(a), y: dx * Math.sin(a) + dy * Math.cos(a) };
 }
 
+/** Convert a point from a panel's local coordinates back to page coordinates. */
+export function fromLocal(r: Pick<Rotatable, "x" | "y" | "rotation">, local: { x: number; y: number }) {
+  const a = (r.rotation * Math.PI) / 180;
+  return {
+    x: r.x + local.x * Math.cos(a) - local.y * Math.sin(a),
+    y: r.y + local.x * Math.sin(a) + local.y * Math.cos(a),
+  };
+}
+
+/** Centre of a rotated rectangle, in page coordinates. */
+export function centerOf(r: Rotatable) {
+  return fromLocal(r, { x: r.w / 2, y: r.h / 2 });
+}
+
 export function containsPoint(r: Rotatable, point: { x: number; y: number }): boolean {
   const local = toLocal(r, point);
   return local.x >= 0 && local.x <= r.w && local.y >= 0 && local.y <= r.h;

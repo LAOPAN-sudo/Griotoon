@@ -9,6 +9,7 @@ import { HistoryControls } from "./HistoryControls";
 import { ShortcutsButton, ShortcutsDialog } from "./ShortcutsDialog";
 import { CropBar } from "./CropBar";
 import { BubbleBar } from "./BubbleBar";
+import { SfxBar } from "./SfxBar";
 import { ImagePicker } from "./ImagePicker";
 import { Toast } from "@/components/ui/Toast";
 import { Toolbar } from "./Toolbar";
@@ -63,6 +64,7 @@ export function Editor() {
           <EditorCanvas />
           <CropBar />
           <BubbleBar />
+          <SfxBar />
         </main>
       </div>
     </div>

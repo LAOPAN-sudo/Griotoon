@@ -1,6 +1,7 @@
 import { nanoid } from "nanoid";
 import type { Bubble, BubbleType, Page, PageElement, Panel, Sfx } from "@/types/page";
 import { DEFAULT_BUBBLE_SIZE, defaultTail } from "./bubbles";
+import { DEFAULT_SFX_FONT_SIZE, DEFAULT_SFX_TEXT } from "./sfx";
 
 /** A4 at 150 dpi. */
 export const PAGE_WIDTH = 1240;
@@ -63,6 +64,7 @@ export function createBubble(
     w,
     h,
     // Narration boxes have no tail. Others point down-left by default.
+    rotation: 0,
     tail: type === "narration" ? undefined : defaultTail({ x, y, w, h }),
     text: "",
     fontFamily: "Comic Neue",
@@ -76,12 +78,13 @@ export function createBubble(
 export function createSfx(page: Page, props: Partial<Sfx> = {}): Sfx {
   return {
     id: nanoid(8),
-    text: "BAM !",
+    text: DEFAULT_SFX_TEXT,
     x: 200,
     y: 900,
-    fontSize: 72,
+    fontSize: DEFAULT_SFX_FONT_SIZE,
     rotation: -12,
     color: "#C0392B",
+    strokeColor: "#000000",
     z: nextZ(page),
     ...props,
   };

@@ -3,7 +3,7 @@
 import type Konva from "konva";
 import { Group, Shape, Text } from "react-konva";
 import type { Bubble } from "@/types/page";
-import { BUBBLE_LINE_HEIGHT, BUBBLE_STROKE_WIDTH, bubblePath, textBox, tracePath } from "@/lib/bubbles";
+import { BUBBLE_LINE_HEIGHT, BUBBLE_STROKE_WIDTH, bubblePath, tailToLocal, textBox, tracePath } from "@/lib/bubbles";
 
 interface BubbleNodeProps {
   bubble: Bubble;
@@ -34,7 +34,8 @@ export function BubbleNode({
   onDblClick,
 }: BubbleNodeProps) {
   const { w, h, type } = bubble;
-  const tail = bubble.tail ? { x: bubble.tail.x - bubble.x, y: bubble.tail.y - bubble.y } : undefined;
+  // The tail is stored in page coordinates; draw it in the bubble's own (rotated) axes.
+  const tail = tailToLocal(bubble);
   const box = textBox(type, w, h);
 
   return (
@@ -43,6 +44,7 @@ export function BubbleNode({
       name="bubble"
       x={bubble.x}
       y={bubble.y}
+      rotation={bubble.rotation}
       draggable={draggable}
       listening={listening}
       onPointerDown={onPointerDown}

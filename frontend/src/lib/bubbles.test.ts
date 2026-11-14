@@ -97,3 +97,62 @@ describe("helpers", () => {
     expect(calls).toContain("arc");
   });
 });
+
+describe("sound effect helpers", async () => {
+  const { sfxStrokeWidth, clampSfxFontSize, MIN_SFX_FONT_SIZE, MAX_SFX_FONT_SIZE } = await import("./sfx");
+
+  it("thickens the outline with the text size", () => {
+    expect(sfxStrokeWidth(96)).toBe(8);
+    expect(sfxStrokeWidth(240)).toBe(20);
+    expect(sfxStrokeWidth(10)).toBe(2); // never thinner than 2 px
+  });
+
+  it("keeps font sizes within limits", () => {
+    expect(clampSfxFontSize(3)).toBe(MIN_SFX_FONT_SIZE);
+    expect(clampSfxFontSize(5000)).toBe(MAX_SFX_FONT_SIZE);
+    expect(clampSfxFontSize(123.6)).toBe(124);
+  });
+});
+
+describe("rotated bubbles", async () => {
+  const { transformTail, tailToLocal } = await import("./bubbles");
+  const { fromLocal, centerOf } = await import("./geometry");
+  const bubble = { x: 100, y: 100, w: 300, h: 150, rotation: 0, tail: { x: 190, y: 340 } };
+
+  it("puts the default tail under the bubble in its own axes", () => {
+    const tail = defaultTail({ ...bubble, rotation: 90 });
+    // Rotated 90°: "below" the bubble is now to its left.
+    expect(tail.x).toBeCloseTo(100 - 240);
+    expect(tail.y).toBeCloseTo(100 + 90);
+  });
+
+  it("converts the tail to local coordinates and back", () => {
+    const rotated = { ...bubble, rotation: 30 };
+    const local = tailToLocal(rotated)!;
+    const back = fromLocal(rotated, local);
+    expect(back.x).toBeCloseTo(190);
+    expect(back.y).toBeCloseTo(340);
+  });
+
+  it("rotates the tail with the bubble", () => {
+    const tail = transformTail(bubble, { x: 100, y: 100, rotation: 90 })!;
+    // Local (90, 240) rotated 90° around (100, 100).
+    expect(tail.x).toBeCloseTo(100 - 240);
+    expect(tail.y).toBeCloseTo(100 + 90);
+  });
+
+  it("stretches the tail with the bubble and follows a move", () => {
+    const tail = transformTail(bubble, { x: 150, y: 120, rotation: 0 }, 2, 0.5)!;
+    expect(tail).toEqual({ x: 150 + 90 * 2, y: 120 + 240 * 0.5 });
+  });
+
+  it("has no tail to transform for narration boxes", () => {
+    expect(transformTail({ ...bubble, tail: undefined }, bubble)).toBeUndefined();
+  });
+
+  it("finds the centre of a rotated box", () => {
+    const c = centerOf({ x: 0, y: 0, w: 200, h: 100, rotation: 90 });
+    expect(c.x).toBeCloseTo(-50);
+    expect(c.y).toBeCloseTo(100);
+  });
+});

@@ -15,8 +15,8 @@ type Patch<T> = Partial<Omit<T, "id">>;
 /** Patch for any element type (panel, bubble or sfx). */
 export type ElementPatch = Patch<Panel> | Patch<Bubble> | Patch<Sfx>;
 
-/** Active editor tool. The sfx tool comes in a later step. */
-export type Tool = "select" | "panel" | "bubble";
+/** Active editor tool. */
+export type Tool = "select" | "panel" | "bubble" | "sfx";
 
 /**
  * Image crop session (double-click on a panel with an image). Changes are
@@ -35,7 +35,7 @@ export interface EditorState {
   crop: CropSession | null;
   /** Type used by the Bubble tool for the next bubble. */
   newBubbleType: BubbleType;
-  /** Bubble whose text is being edited in the overlay text field. */
+  /** Bubble or sound effect whose text is being edited in the overlay text field. */
   editingId: string | null;
   /** Previous page snapshots, oldest first. */
   past: Page[];
@@ -71,7 +71,7 @@ export interface EditorState {
 
   /** Change the type of bubbles (adds or removes the tail as needed). Also the default for new ones. */
   setBubbleType: (ids: string[], type: BubbleType) => void;
-  /** Open / close the text field of a bubble. */
+  /** Open / close the text field of a bubble or sound effect. */
   startEditing: (id: string) => void;
   stopEditing: () => void;
 
@@ -325,7 +325,8 @@ export const editorStateCreator: StateCreator<EditorState> = (set, get) => {
     },
 
     startEditing: (id) => {
-      if (!get().page.bubbles.some((b) => b.id === id)) return;
+      const { page } = get();
+      if (!page.bubbles.some((b) => b.id === id) && !page.sfx.some((x) => x.id === id)) return;
       get().endCrop();
       set({ editingId: id, selectedIds: [id], tool: "select" });
     },

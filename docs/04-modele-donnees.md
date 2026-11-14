@@ -113,7 +113,8 @@ Coordonnées en **pixels de la page** (origine en haut à gauche). Le canvas met
       "id": "b1",
       "type": "speech",                  // speech | thought | shout | narration
       "x": 700, "y": 100, "w": 300, "h": 140,
-      "tail": { "x": 640, "y": 320 },    // pointe de la bulle (absente pour narration)
+      "rotation": 0,                     // degrés, autour du coin (x, y) comme les cases
+      "tail": { "x": 640, "y": 320 },    // pointe de la bulle, en coordonnées de page (absente pour narration)
       "text": "Vite, le marché ouvre déjà !",
       "fontFamily": "Comic Neue",
       "fontSize": 28,
@@ -123,7 +124,7 @@ Coordonnées en **pixels de la page** (origine en haut à gauche). Le canvas met
     }
   ],
   "sfx": [                               // onomatopées (phase 1, en option)
-    { "id": "s1", "text": "BAM !", "x": 200, "y": 900, "fontSize": 72, "rotation": -12, "color": "#C0392B", "z": 11 }
+    { "id": "s1", "text": "BAM !", "x": 200, "y": 900, "fontSize": 96, "rotation": -12, "color": "#C0392B", "strokeColor": "#000000", "z": 11 }
   ]
 }
 ```
@@ -146,12 +147,18 @@ export interface Panel {
   characters: string[]; description?: string; z: number;
 }
 export interface Bubble {
-  id: string; type: BubbleType; x: number; y: number; w: number; h: number;
+  id: string; type: BubbleType; x: number; y: number; w: number; h: number; rotation: number;
   tail?: { x: number; y: number }; text: string;
   fontFamily: string; fontSize: number; align: 'left' | 'center' | 'right';
   panelId?: string; z: number;
 }
-export interface Sfx { id: string; text: string; x: number; y: number; fontSize: number; rotation: number; color: string; z: number; }
+export interface Sfx {
+  id: string; text: string; x: number; y: number;   // (x, y) = coin haut gauche, centre de rotation (comme Konva)
+  fontSize: number; rotation: number;
+  color: string;        // couleur du texte
+  strokeColor: string;  // couleur du contour (épaisseur proportionnelle à fontSize)
+  z: number;
+}
 export interface Page {
   version: 1; width: number; height: number; background: string;
   gutter: number; margin: number;

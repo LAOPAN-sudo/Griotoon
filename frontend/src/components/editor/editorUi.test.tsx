@@ -11,7 +11,8 @@ import { useUiStore } from "@/store/uiStore";
 import { Toolbar } from "./Toolbar";
 import { CropBar } from "./CropBar";
 import { BubbleBar } from "./BubbleBar";
-import { BubbleTextEditor } from "./BubbleTextEditor";
+import { TextEditor } from "./TextEditor";
+import { SfxBar } from "./SfxBar";
 import { Toast } from "@/components/ui/Toast";
 import { importImageIntoPanel } from "./imageImport";
 
@@ -324,7 +325,7 @@ describe("bubbles UI", () => {
   });
 
   it("edits the text in a field over the bubble and saves it on Escape", async () => {
-    render(<BubbleTextEditor />);
+    render(<TextEditor />);
     act(() => {
       store().startEditing(store().addBubble({ text: "Salut" }));
     });
@@ -344,7 +345,7 @@ describe("bubbles UI", () => {
   });
 
   it("saves on blur and adds no step when the text did not change", () => {
-    render(<BubbleTextEditor />);
+    render(<TextEditor />);
     act(() => {
       store().startEditing(store().addBubble({ text: "Bonjour" }));
     });
@@ -358,7 +359,7 @@ describe("bubbles UI", () => {
     render(
       <>
         <EditorShortcuts />
-        <BubbleTextEditor />
+        <TextEditor />
       </>,
     );
     act(() => {
@@ -368,5 +369,74 @@ describe("bubbles UI", () => {
     fireEvent.keyDown(screen.getByRole("textbox"), { key: "b" });
     expect(bubbles()).toHaveLength(1);
     expect(store().tool).toBe("select");
+  });
+});
+
+describe("sound effects UI", () => {
+  const store = () => useEditorStore.getState();
+  const sfx = () => store().page.sfx;
+
+  it("O selects the tool and the bar explains how to place one", () => {
+    render(
+      <>
+        <EditorShortcuts />
+        <SfxBar />
+      </>,
+    );
+    fireEvent.keyDown(window, { key: "o" });
+    expect(store().tool).toBe("sfx");
+    expect(screen.getByRole("toolbar", { name: "Onomatopée" })).toHaveTextContent("Clique sur la page");
+  });
+
+  it("changes text and outline colours of the selection in one step each", () => {
+    render(<SfxBar />);
+    act(() => {
+      store().select([store().addSfx(), store().addSfx()]);
+    });
+    const steps = store().past.length;
+    fireEvent.click(screen.getByRole("button", { name: "Jaune" }));
+    fireEvent.click(screen.getByRole("button", { name: "Contour blanc" }));
+    expect(sfx().map((x) => [x.color, x.strokeColor])).toEqual([
+      ["#F1C40F", "#FFFFFF"],
+      ["#F1C40F", "#FFFFFF"],
+    ]);
+    expect(screen.getByRole("button", { name: "Jaune" })).toHaveAttribute("aria-pressed", "true");
+    expect(store().past.length).toBe(steps + 2);
+  });
+
+  it("selects the default text so typing replaces it, Enter saves", async () => {
+    render(<TextEditor />);
+    act(() => {
+      store().startEditing(store().addSfx());
+    });
+    const field = screen.getByRole("textbox", { name: "Texte de l'onomatopée" }) as HTMLTextAreaElement;
+    await waitFor(() => expect(field).toHaveFocus());
+    expect([field.selectionStart, field.selectionEnd]).toEqual([0, "BAM !".length]);
+    fireEvent.change(field, { target: { value: "VLAN !" } });
+    fireEvent.keyDown(field, { key: "Enter" });
+    expect(sfx()[0].text).toBe("VLAN !");
+    expect(store().editingId).toBeNull();
+  });
+
+  it("removes a sound effect whose text was emptied", () => {
+    render(<TextEditor />);
+    act(() => {
+      store().startEditing(store().addSfx());
+    });
+    const field = screen.getByRole("textbox");
+    fireEvent.change(field, { target: { value: "   " } });
+    fireEvent.keyDown(field, { key: "Escape" });
+    expect(sfx()).toHaveLength(0);
+    expect(store().selectedIds).toEqual([]);
+  });
+
+  it("keeps a new line with Shift + Enter", () => {
+    render(<TextEditor />);
+    act(() => {
+      store().startEditing(store().addSfx());
+    });
+    const field = screen.getByRole("textbox");
+    fireEvent.keyDown(field, { key: "Enter", shiftKey: true });
+    expect(store().editingId).not.toBeNull();
   });
 });

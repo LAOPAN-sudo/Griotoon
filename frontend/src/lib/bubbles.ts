@@ -3,7 +3,8 @@
 // the canvas just replays them. This keeps the shapes testable and makes the
 // editor, PNG and PDF export draw exactly the same thing.
 
-import type { BubbleType } from "@/types/page";
+import type { Bubble, BubbleType } from "@/types/page";
+import { fromLocal, toLocal } from "./geometry";
 
 export type PathCommand =
   | { op: "move"; x: number; y: number }
@@ -26,9 +27,30 @@ export const DEFAULT_BUBBLE_SIZE: Record<BubbleType, { w: number; h: number }> =
   narration: { w: 360, h: 110 },
 };
 
-/** Default tail tip for a new bubble: below and slightly left of the box. */
-export function defaultTail(box: { x: number; y: number; w: number; h: number }): Point {
-  return { x: box.x + box.w * 0.3, y: box.y + box.h + 90 };
+/** Default tail tip: below and slightly left of the box (in the bubble's own axes if rotated). */
+export function defaultTail(box: { x: number; y: number; w: number; h: number; rotation?: number }): Point {
+  return fromLocal({ x: box.x, y: box.y, rotation: box.rotation ?? 0 }, { x: box.w * 0.3, y: box.h + 90 });
+}
+
+/** Tail tip in the bubble's local (rotated) coordinates, for drawing. */
+export function tailToLocal(bubble: Pick<Bubble, "x" | "y" | "w" | "h" | "rotation" | "tail">): Point | undefined {
+  return bubble.tail ? toLocal(bubble, bubble.tail) : undefined;
+}
+
+/**
+ * Where the tail ends up after the bubble is moved / rotated / stretched by
+ * (sx, sy) along its own axes: the tip keeps the same place relative to the
+ * bubble, exactly as it was shown on screen during the gesture.
+ */
+export function transformTail(
+  before: Pick<Bubble, "x" | "y" | "w" | "h" | "rotation" | "tail">,
+  after: { x: number; y: number; rotation: number },
+  sx = 1,
+  sy = 1,
+): Point | undefined {
+  const local = tailToLocal(before);
+  if (!local) return undefined;
+  return fromLocal(after, { x: local.x * sx, y: local.y * sy });
 }
 
 const TAU = Math.PI * 2;
