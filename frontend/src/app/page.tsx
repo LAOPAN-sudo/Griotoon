@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { LanguageSwitcher } from "@/components/ui/LanguageSwitcher";
 import { useT } from "@/i18n";
 
@@ -21,8 +22,14 @@ export default function Home() {
           {t("app.tagline")}
         </h1>
         <p className="max-w-xl text-lg text-zinc-600">{t("app.description")}</p>
+        <Link
+          href="/editeur"
+          className="mt-4 rounded-md bg-zinc-900 px-5 py-2.5 font-medium text-white hover:bg-zinc-700"
+        >
+          {t("home.openEditor")}
+        </Link>
         <p className="mt-6 rounded-full bg-amber-100 px-4 py-1 text-sm text-amber-900">
-          {t("home.phase", { phase: 1 })} · {t("home.status")}
+          {t("home.phase", { phase: 1 })}
         </p>
       </main>
     </div>

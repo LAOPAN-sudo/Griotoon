@@ -18,13 +18,16 @@ npm run build        # build de production
 
 ```
 src/
-├── app/                 # routes Next.js (App Router)
+├── app/                 # routes Next.js (App Router) : / et /editeur
 ├── components/
+│   ├── editor/          # éditeur : Editor, EditorCanvas (Konva), ZoomControls
 │   ├── LocaleSync.tsx   # restaure la langue choisie, met à jour <html lang>
 │   └── ui/              # boutons, sélecteur de langue…
 ├── i18n/                # traductions : fr.ts (référence), en.ts, useT()
 ├── lib/page.ts          # page vide et éléments par défaut (case, bulle, onomatopée)
+├── lib/viewport.ts      # calculs de zoom et d'ajustement à l'écran (fonctions pures)
 ├── store/editorStore.ts # store Zustand de l'éditeur + annuler/rétablir
+├── store/viewStore.ts   # zoom et position de la vue (hors historique)
 └── types/page.ts        # format JSON d'une page (docs/04-modele-donnees.md)
 ```
 
