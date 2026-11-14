@@ -1,5 +1,6 @@
 import { nanoid } from "nanoid";
 import type { Bubble, BubbleType, Page, PageElement, Panel, Sfx } from "@/types/page";
+import { DEFAULT_BUBBLE_SIZE, defaultTail } from "./bubbles";
 
 /** A4 at 150 dpi. */
 export const PAGE_WIDTH = 1240;
@@ -52,8 +53,8 @@ export function createBubble(
   const type = props.type ?? "speech";
   const x = props.x ?? 400;
   const y = props.y ?? 200;
-  const w = props.w ?? 300;
-  const h = props.h ?? 140;
+  const w = props.w ?? DEFAULT_BUBBLE_SIZE[type].w;
+  const h = props.h ?? DEFAULT_BUBBLE_SIZE[type].h;
   return {
     id: nanoid(8),
     type,
@@ -62,7 +63,7 @@ export function createBubble(
     w,
     h,
     // Narration boxes have no tail. Others point down-left by default.
-    tail: type === "narration" ? undefined : { x: x + w * 0.3, y: y + h + 80 },
+    tail: type === "narration" ? undefined : defaultTail({ x, y, w, h }),
     text: "",
     fontFamily: "Comic Neue",
     fontSize: 28,

@@ -7,19 +7,35 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type Konva from "konva";
-import { Group, Image as KonvaImage, Layer, Line, Rect, Stage, Transformer } from "react-konva";
-import { useEditorStore } from "@/store/editorStore";
+import { Circle, Group, Image as KonvaImage, Layer, Line, Rect, Stage, Transformer } from "react-konva";
+import { useEditorStore, type ElementPatch } from "@/store/editorStore";
 import { useViewStore } from "@/store/viewStore";
 import { useUiStore } from "@/store/uiStore";
 import { wheelDeltaPixels, wheelZoomFactor } from "@/lib/viewport";
 import { boundsOf, rectFromPoints, toLocal, topmostAt, type Box } from "@/lib/geometry";
 import { buildSnapTargets, snapBox, snapPoint, SNAP_TOLERANCE_PX, type Guides } from "@/lib/snapping";
 import { clampCrop, zoomCrop } from "@/lib/image";
+import { canvasFontFamily, DEFAULT_BUBBLE_SIZE, defaultTail } from "@/lib/bubbles";
 import { useT } from "@/i18n";
-import type { Panel } from "@/types/page";
+import type { Bubble, Panel } from "@/types/page";
 import { useSpaceKey } from "./useSpaceKey";
 import { PanelNode, useImageElement } from "./PanelNode";
 import { importImageIntoPanel, openImagePicker } from "./imageImport";
+import { BubbleNode } from "./BubbleNode";
+import { BubbleTextEditor } from "./BubbleTextEditor";
+
+/** Wait for the comic fonts before drawing text on the canvas (Konva can't redraw by itself when they arrive). */
+function useComicFonts() {
+  const [fonts, setFonts] = useState<{ ready: boolean; comic: string }>({ ready: false, comic: "Comic Neue" });
+  useEffect(() => {
+    const comic = canvasFontFamily("Comic Neue");
+    const bangers = canvasFontFamily("Bangers");
+    const done = () => setFonts({ ready: true, comic });
+    if (!document.fonts) return done();
+    Promise.all([document.fonts.load(`28px ${comic}`), document.fonts.load(`28px ${bangers}`)]).then(done, done);
+  }, []);
+  return fonts;
+}
 
 /** Smallest panel size, in page pixels. */
 const MIN_PANEL_SIZE = 40;
@@ -43,6 +59,8 @@ export default function EditorCanvas() {
   const selectedIds = useEditorStore((s) => s.selectedIds);
   const tool = useEditorStore((s) => s.tool);
   const crop = useEditorStore((s) => s.crop);
+  const editingId = useEditorStore((s) => s.editingId);
+  const fonts = useComicFonts();
   const view = useViewStore((s) => s.view);
   const viewport = useViewStore((s) => s.viewport);
   const spacePressed = useSpaceKey();
@@ -119,22 +137,28 @@ export default function EditorCanvas() {
   // --------------------------------------------------------------- selection
 
   const panels = useMemo(() => [...page.panels].sort((a, b) => a.z - b.z), [page.panels]);
-  const selectedPanelIds = useMemo(() => {
-    const ids = new Set(page.panels.map((p) => p.id));
+  const bubbles = useMemo(() => [...page.bubbles].sort((a, b) => a.z - b.z), [page.bubbles]);
+  /** Selected elements that have a Konva node the Transformer can hold. */
+  const selectedNodeIds = useMemo(() => {
+    const ids = new Set([...page.panels, ...page.bubbles].map((el) => el.id));
     return selectedIds.filter((id) => ids.has(id));
-  }, [page.panels, selectedIds]);
+  }, [page.panels, page.bubbles, selectedIds]);
+  const selectionHasBubble = selectedIds.some((id) => page.bubbles.some((b) => b.id === id));
+  /** The single selected bubble, if any (gets a tail handle). */
+  const soloBubble: Bubble | undefined =
+    selectedIds.length === 1 ? page.bubbles.find((b) => b.id === selectedIds[0]) : undefined;
 
   // Attach the Transformer (selection handles) to the selected Konva nodes.
   useEffect(() => {
     const transformer = transformerRef.current;
     const stage = stageRef.current;
     if (!transformer || !stage) return;
-    const nodes = (crop ? [] : selectedPanelIds)
+    const nodes = (crop ? [] : selectedNodeIds)
       .map((id) => stage.findOne(`#${id}`))
       .filter((n): n is Konva.Node => !!n);
     transformer.nodes(nodes);
     transformer.getLayer()?.batchDraw();
-  }, [selectedPanelIds, page.panels, crop]);
+  }, [selectedNodeIds, page.panels, page.bubbles, crop]);
 
   const canEdit = tool === "select" && !spacePressed && !crop;
 
@@ -175,12 +199,12 @@ export default function EditorCanvas() {
 
   // ------------------------------------------------------------ drag & resize
 
-  const onPanelPointerDown = (panel: Panel, e: Konva.KonvaEventObject<MouseEvent | TouchEvent>) => {
+  const onElementPointerDown = (id: string, e: Konva.KonvaEventObject<MouseEvent | TouchEvent>) => {
     if (!canEdit) return;
     const additive = "shiftKey" in e.evt && e.evt.shiftKey;
     const { selectedIds, select } = useEditorStore.getState();
-    if (additive) select(panel.id, true);
-    else if (!selectedIds.includes(panel.id)) select(panel.id);
+    if (additive) select(id, true);
+    else if (!selectedIds.includes(id)) select(id);
   };
 
   /**
@@ -188,17 +212,33 @@ export default function EditorCanvas() {
    * panels selected, each one fires dragend: the first call saves them all,
    * the next ones change nothing and add no history entry.
    */
-  const onPanelDragEnd = (e: Konva.KonvaEventObject<DragEvent>) => {
+  const onElementDragEnd = (e: Konva.KonvaEventObject<DragEvent>) => {
     setGuides({});
+    const { page, updateElements } = useEditorStore.getState();
     const nodes = new Set([...(transformerRef.current?.nodes() ?? []), e.target]);
     const patches = [...nodes].map((node) => {
-      const patch = { x: px(node.x()), y: px(node.y()) };
+      const x = px(node.x());
+      const y = px(node.y());
       // If the rounded value equals the previous one, React won't touch the
       // node: align it ourselves so the canvas matches the stored page.
-      node.position(patch);
-      return { id: node.id(), patch };
+      node.position({ x, y });
+      const bubble = page.bubbles.find((b) => b.id === node.id());
+      if (!bubble) return { id: node.id(), patch: { x, y } };
+      // A bubble carries its tail along, and remembers the panel it now sits on.
+      const dx = x - bubble.x;
+      const dy = y - bubble.y;
+      const center = { x: x + bubble.w / 2, y: y + bubble.h / 2 };
+      return {
+        id: bubble.id,
+        patch: {
+          x,
+          y,
+          tail: bubble.tail && { x: bubble.tail.x + dx, y: bubble.tail.y + dy },
+          panelId: topmostAt(page.panels, center)?.id,
+        },
+      };
     });
-    useEditorStore.getState().updateElements(patches);
+    updateElements(patches);
   };
 
   /**
@@ -209,7 +249,31 @@ export default function EditorCanvas() {
     setGuides({});
     const { page, updateElements } = useEditorStore.getState();
     const nodes = transformerRef.current?.nodes() ?? [];
-    const patches = nodes.flatMap((node) => {
+    const patches = nodes.flatMap((node): { id: string; patch: ElementPatch }[] => {
+      const bubble = page.bubbles.find((b) => b.id === node.id());
+      if (bubble) {
+        const sx = node.scaleX();
+        const sy = node.scaleY();
+        const x = px(node.x());
+        const y = px(node.y());
+        node.setAttrs({ x, y, scaleX: 1, scaleY: 1 });
+        return [
+          {
+            id: bubble.id,
+            patch: {
+              x,
+              y,
+              w: px(Math.max(MIN_PANEL_SIZE, bubble.w * sx)),
+              h: px(Math.max(MIN_PANEL_SIZE, bubble.h * sy)),
+              // The tail was stretched with the bubble on screen: keep it where it was shown.
+              tail: bubble.tail && {
+                x: px(x + (bubble.tail.x - bubble.x) * sx),
+                y: px(y + (bubble.tail.y - bubble.y) * sy),
+              },
+            },
+          },
+        ];
+      }
       const panel = page.panels.find((p) => p.id === node.id());
       if (!panel) return [];
       const w = px(Math.max(MIN_PANEL_SIZE, panel.w * node.scaleX()));
@@ -247,6 +311,11 @@ export default function EditorCanvas() {
     if (useEditorStore.getState().crop && e.target.name() !== "cropImage") {
       useEditorStore.getState().endCrop();
     }
+    if (tool === "bubble") {
+      const p = pointerOnPage();
+      if (p) placeBubble(p);
+      return;
+    }
     if (tool === "panel") {
       const p = pointerOnPage();
       if (!p) return;
@@ -267,6 +336,22 @@ export default function EditorCanvas() {
     const end = snapPoint(p, targetsWithout([]), tolerance());
     setGuides(end.guides);
     setDraft({ ...draft, end });
+  };
+
+  /** Bubble tool: a click places a bubble centred on the pointer and opens its text field. */
+  const placeBubble = (p: Point) => {
+    const store = useEditorStore.getState();
+    const type = store.newBubbleType;
+    const { w, h } = DEFAULT_BUBBLE_SIZE[type];
+    const box = { x: px(p.x - w / 2), y: px(p.y - h / 2), w, h };
+    const tail = defaultTail(box);
+    const id = store.addBubble({
+      ...box,
+      type,
+      tail: type === "narration" ? undefined : { x: px(tail.x), y: px(tail.y) },
+      panelId: topmostAt(store.page.panels, p)?.id,
+    });
+    store.startEditing(id); // also selects it and goes back to the Select tool
   };
 
   const finishDrawing = () => {
@@ -321,6 +406,13 @@ export default function EditorCanvas() {
     updateCrop(next);
   };
 
+  /** Dragging the round tail handle points the bubble elsewhere (one undo step per drag). */
+  const onTailDragMove = (e: Konva.KonvaEventObject<DragEvent>) => {
+    if (!soloBubble) return;
+    const tail = { x: px(e.target.x()), y: px(e.target.y()) };
+    useEditorStore.getState().updateElements([{ id: soloBubble.id, patch: { tail } }], `tail:${soloBubble.id}`);
+  };
+
   /** Page point under a browser drag event (file dragged from the computer). */
   const pagePointOf = (e: React.DragEvent): Point => {
     const rect = containerRef.current!.getBoundingClientRect();
@@ -358,7 +450,7 @@ export default function EditorCanvas() {
     ? "grabbing"
     : spacePressed
       ? "grab"
-      : tool === "panel"
+      : tool === "panel" || tool === "bubble"
         ? "crosshair"
         : "default";
 
@@ -422,15 +514,29 @@ export default function EditorCanvas() {
                 listening={tool === "select"}
                 draggable={canEdit}
                 dragBoundFunc={panelDragBound(panel)}
-                onPointerDown={(e) => onPanelPointerDown(panel, e)}
-                onDragEnd={onPanelDragEnd}
+                onPointerDown={(e) => onElementPointerDown(panel.id, e)}
+                onDragEnd={onElementDragEnd}
                 onDblClick={() => onPanelDblClick(panel)}
               />
             ))}
           </Layer>
 
-          {/* Filled in later steps: bubbles and sfx. */}
-          <Layer name="bubblesLayer" />
+          {/* Re-created once the fonts are loaded, so the text is measured with the right font. */}
+          <Layer name="bubblesLayer" key={fonts.ready ? "fonts-ready" : "fonts-loading"}>
+            {bubbles.map((bubble) => (
+              <BubbleNode
+                key={bubble.id}
+                bubble={bubble}
+                fontFamily={fonts.comic}
+                editing={editingId === bubble.id}
+                listening={tool === "select" && !crop}
+                draggable={canEdit && editingId !== bubble.id}
+                onPointerDown={(e) => onElementPointerDown(bubble.id, e)}
+                onDragEnd={onElementDragEnd}
+                onDblClick={() => useEditorStore.getState().startEditing(bubble.id)}
+              />
+            ))}
+          </Layer>
 
           <Layer name="uiLayer">
             {/* Crop session: the whole image, faded, can be dragged; the panel shows the result. */}
@@ -511,9 +617,32 @@ export default function EditorCanvas() {
                 listening={false}
               />
             )}
+            {soloBubble?.tail && tool === "select" && !editingId && (
+              <Circle
+                name="tailHandle"
+                x={soloBubble.tail.x}
+                y={soloBubble.tail.y}
+                radius={7 / view.scale}
+                fill="#FFFFFF"
+                stroke={SELECTION_COLOR}
+                strokeWidth={2}
+                strokeScaleEnabled={false}
+                draggable={!spacePressed}
+                onDragMove={onTailDragMove}
+                onMouseEnter={(e) => {
+                  const container = e.target.getStage()?.container();
+                  if (container) container.style.cursor = "move";
+                }}
+                onMouseLeave={(e) => {
+                  const container = e.target.getStage()?.container();
+                  if (container) container.style.cursor = "";
+                }}
+              />
+            )}
             <Transformer
               ref={transformerRef}
               visible={tool === "select" && !crop}
+              rotateEnabled={!selectionHasBubble}
               ignoreStroke
               flipEnabled={false}
               keepRatio={false}
@@ -534,6 +663,7 @@ export default function EditorCanvas() {
           </Layer>
         </Stage>
       )}
+      <BubbleTextEditor />
     </div>
   );
 }

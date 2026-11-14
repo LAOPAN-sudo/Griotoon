@@ -49,6 +49,7 @@ export function matchShortcut(e: KeyInfo): ShortcutAction | null {
   if (!e.shiftKey) {
     if (key === "v") return { type: "tool", tool: "select" };
     if (key === "c") return { type: "tool", tool: "panel" };
+    if (key === "b") return { type: "tool", tool: "bubble" };
   }
   return null;
 }
@@ -95,6 +96,7 @@ export const SHORTCUT_GROUPS: ShortcutGroup[] = [
     items: [
       { combos: [["V"]], descriptionKey: "shortcuts.toolSelect" },
       { combos: [["C"]], descriptionKey: "shortcuts.toolPanel" },
+      { combos: [["B"]], descriptionKey: "shortcuts.toolBubble" },
     ],
   },
   {
@@ -103,6 +105,8 @@ export const SHORTCUT_GROUPS: ShortcutGroup[] = [
       { combos: [["keys.click"]], descriptionKey: "shortcuts.select" },
       { combos: [["keys.shift", "keys.click"]], descriptionKey: "shortcuts.selectAdd" },
       { combos: [["keys.doubleClick"]], descriptionKey: "shortcuts.panelImage" },
+      { combos: [["keys.doubleClick"]], descriptionKey: "shortcuts.bubbleText" },
+      { combos: [["keys.drag"]], descriptionKey: "shortcuts.bubbleTail" },
       { combos: [["keys.delete"], ["keys.backspace"]], descriptionKey: "shortcuts.delete" },
       { combos: [["keys.ctrl", "D"]], descriptionKey: "shortcuts.duplicate" },
       { combos: [["keys.arrows"]], descriptionKey: "shortcuts.nudge" },

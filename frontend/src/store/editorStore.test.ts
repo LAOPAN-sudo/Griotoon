@@ -360,3 +360,58 @@ describe("panel images and crop sessions", () => {
     expect(s().page.panels).toHaveLength(0);
   });
 });
+
+describe("bubbles", () => {
+  it("creates bubbles of each type with the right defaults", () => {
+    s().addBubble({ type: "narration", x: 0, y: 0 });
+    s().addBubble({ type: "shout", x: 0, y: 0 });
+    const [narration, shout] = s().page.bubbles;
+    expect(narration.tail).toBeUndefined();
+    expect(shout.tail).toEqual({ x: shout.w * 0.3, y: shout.h + 90 });
+    expect(shout.fontFamily).toBe("Comic Neue");
+  });
+
+  it("changes bubble types in one step, removing or adding the tail", () => {
+    const a = s().addBubble({ type: "speech" });
+    const b = s().addBubble({ type: "narration" });
+    const steps = s().past.length;
+
+    s().setBubbleType([a, b], "narration");
+    expect(s().page.bubbles.map((x) => x.type)).toEqual(["narration", "narration"]);
+    expect(s().page.bubbles[0].tail).toBeUndefined();
+    expect(s().past.length).toBe(steps + 1);
+    expect(s().newBubbleType).toBe("narration");
+
+    s().setBubbleType([a], "thought");
+    expect(s().page.bubbles[0].tail).toBeDefined();
+    s().undo();
+    s().undo();
+    expect(s().page.bubbles[0].type).toBe("speech");
+  });
+
+  it("remembers the type for new bubbles even without a selection", () => {
+    s().setBubbleType([], "shout");
+    expect(s().newBubbleType).toBe("shout");
+    expect(s().past).toHaveLength(0);
+  });
+
+  it("opens the text field of a bubble and closes it", () => {
+    const b = s().addBubble();
+    s().setTool("bubble");
+    s().startEditing(b);
+    expect(s().editingId).toBe(b);
+    expect(s().selectedIds).toEqual([b]);
+    expect(s().tool).toBe("select");
+    s().stopEditing();
+    expect(s().editingId).toBeNull();
+    s().startEditing("nope");
+    expect(s().editingId).toBeNull();
+  });
+
+  it("closes the text field when the bubble is deleted", () => {
+    const b = s().addBubble();
+    s().startEditing(b);
+    s().removeElement(b);
+    expect(s().editingId).toBeNull();
+  });
+});

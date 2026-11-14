@@ -1,7 +1,8 @@
 import { create, type StateCreator } from "zustand";
 import { produce, type Draft } from "immer";
 import { nanoid } from "nanoid";
-import type { Bubble, Page, PageElement, Panel, PanelImage, Sfx } from "@/types/page";
+import type { Bubble, BubbleType, Page, PageElement, Panel, PanelImage, Sfx } from "@/types/page";
+import { defaultTail } from "@/lib/bubbles";
 import { allElements, createBubble, createEmptyPage, createPanel, createSfx, nextZ } from "@/lib/page";
 
 export const HISTORY_LIMIT = 100;
@@ -14,8 +15,8 @@ type Patch<T> = Partial<Omit<T, "id">>;
 /** Patch for any element type (panel, bubble or sfx). */
 export type ElementPatch = Patch<Panel> | Patch<Bubble> | Patch<Sfx>;
 
-/** Active editor tool. Bubble and sfx tools come in later steps. */
-export type Tool = "select" | "panel";
+/** Active editor tool. The sfx tool comes in a later step. */
+export type Tool = "select" | "panel" | "bubble";
 
 /**
  * Image crop session (double-click on a panel with an image). Changes are
@@ -32,6 +33,10 @@ export interface EditorState {
   selectedIds: string[];
   tool: Tool;
   crop: CropSession | null;
+  /** Type used by the Bubble tool for the next bubble. */
+  newBubbleType: BubbleType;
+  /** Bubble whose text is being edited in the overlay text field. */
+  editingId: string | null;
   /** Previous page snapshots, oldest first. */
   past: Page[];
   /** Undone snapshots, most recently undone last. */
@@ -63,6 +68,12 @@ export interface EditorState {
   select: (ids: string | string[] | null, additive?: boolean) => void;
 
   setTool: (tool: Tool) => void;
+
+  /** Change the type of bubbles (adds or removes the tail as needed). Also the default for new ones. */
+  setBubbleType: (ids: string[], type: BubbleType) => void;
+  /** Open / close the text field of a bubble. */
+  startEditing: (id: string) => void;
+  stopEditing: () => void;
 
   /** Put an image in a panel (or remove it with null). Selects the panel. */
   setPanelImage: (panelId: string, image: PanelImage | null) => void;
@@ -119,12 +130,14 @@ export const editorStateCreator: StateCreator<EditorState> = (set, get) => {
     selectedIds: [],
     tool: "select",
     crop: null,
+    newBubbleType: "speech",
+    editingId: null,
     past: [],
     future: [],
 
     loadPage: (page) => {
       lastMerge = null;
-      set({ page, selectedIds: [], past: [], future: [], crop: null });
+      set({ page, selectedIds: [], past: [], future: [], crop: null, editingId: null });
     },
 
     addPanel: (props) => {
@@ -246,7 +259,10 @@ export const editorStateCreator: StateCreator<EditorState> = (set, get) => {
           if (b.panelId && toRemove.has(b.panelId)) delete b.panelId;
         }
       });
-      set({ selectedIds: get().selectedIds.filter((id) => !toRemove.has(id)) });
+      set({
+        selectedIds: get().selectedIds.filter((id) => !toRemove.has(id)),
+        editingId: toRemove.has(get().editingId ?? "") ? null : get().editingId,
+      });
     },
 
     applyTemplate: (panels) => {
@@ -294,6 +310,27 @@ export const editorStateCreator: StateCreator<EditorState> = (set, get) => {
       get().endCrop();
       set({ tool });
     },
+
+    setBubbleType: (ids, type) => {
+      set({ newBubbleType: type });
+      const wanted = new Set(ids);
+      commit((d) => {
+        for (const b of d.bubbles) {
+          if (!wanted.has(b.id) || b.type === type) continue;
+          b.type = type;
+          if (type === "narration") delete b.tail;
+          else if (!b.tail) b.tail = defaultTail(b);
+        }
+      });
+    },
+
+    startEditing: (id) => {
+      if (!get().page.bubbles.some((b) => b.id === id)) return;
+      get().endCrop();
+      set({ editingId: id, selectedIds: [id], tool: "select" });
+    },
+
+    stopEditing: () => set({ editingId: null }),
 
     setPanelImage: (panelId, image) => {
       get().endCrop(false);

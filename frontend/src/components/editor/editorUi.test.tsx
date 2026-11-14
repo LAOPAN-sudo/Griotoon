@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { useEditorStore } from "@/store/editorStore";
 import { useLocaleStore } from "@/i18n";
 import { createEmptyPage } from "@/lib/page";
@@ -10,6 +10,8 @@ import { ShortcutsButton, ShortcutsDialog } from "./ShortcutsDialog";
 import { useUiStore } from "@/store/uiStore";
 import { Toolbar } from "./Toolbar";
 import { CropBar } from "./CropBar";
+import { BubbleBar } from "./BubbleBar";
+import { BubbleTextEditor } from "./BubbleTextEditor";
 import { Toast } from "@/components/ui/Toast";
 import { importImageIntoPanel } from "./imageImport";
 
@@ -277,5 +279,94 @@ describe("images", () => {
     expect(cropped.scale).toBeCloseTo(1);
     expect(cropped.offsetX).toBeLessThanOrEqual(0);
     expect(cropped.offsetX + cropped.width * cropped.scale).toBeGreaterThanOrEqual(400);
+  });
+});
+
+describe("bubbles UI", () => {
+  const store = () => useEditorStore.getState();
+  const bubbles = () => store().page.bubbles;
+
+  it("B selects the Bubble tool and the bar picks the type of the next bubble", () => {
+    render(
+      <>
+        <EditorShortcuts />
+        <BubbleBar />
+      </>,
+    );
+    expect(screen.queryByRole("toolbar", { name: "Bulles" })).toBeNull();
+    fireEvent.keyDown(window, { key: "b" });
+    expect(store().tool).toBe("bubble");
+    const bar = screen.getByRole("toolbar", { name: "Bulles" });
+    expect(bar).toHaveTextContent("Clique sur la page");
+    fireEvent.click(screen.getByRole("button", { name: "Cri" }));
+    expect(store().newBubbleType).toBe("shout");
+    expect(screen.getByRole("button", { name: "Cri" })).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("changes the type of the selected bubbles", () => {
+    render(<BubbleBar />);
+    act(() => {
+      const a = store().addBubble({ type: "speech" });
+      const b = store().addBubble({ type: "speech" });
+      store().select([a, b]);
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Narration" }));
+    expect(bubbles().map((b) => b.type)).toEqual(["narration", "narration"]);
+    expect(bubbles()[0].tail).toBeUndefined();
+  });
+
+  it("hides the bar when the selection is not only bubbles", () => {
+    render(<BubbleBar />);
+    act(() => {
+      store().select([store().addBubble(), store().addPanel()]);
+    });
+    expect(screen.queryByRole("toolbar")).toBeNull();
+  });
+
+  it("edits the text in a field over the bubble and saves it on Escape", async () => {
+    render(<BubbleTextEditor />);
+    act(() => {
+      store().startEditing(store().addBubble({ text: "Salut" }));
+    });
+    const field = screen.getByRole("textbox", { name: "Texte de la bulle" });
+    expect(field).toHaveValue("Salut");
+    await waitFor(() => expect(field).toHaveFocus()); // focus is deferred by one tick
+    fireEvent.change(field, { target: { value: "Vite, le marché ouvre déjà !" } });
+    // Still a draft: not saved before the field closes.
+    expect(bubbles()[0].text).toBe("Salut");
+    fireEvent.keyDown(field, { key: "Escape" });
+    expect(bubbles()[0].text).toBe("Vite, le marché ouvre déjà !");
+    expect(store().editingId).toBeNull();
+    expect(screen.queryByRole("textbox")).toBeNull();
+    // One undo step for the text.
+    act(() => store().undo());
+    expect(bubbles()[0].text).toBe("Salut");
+  });
+
+  it("saves on blur and adds no step when the text did not change", () => {
+    render(<BubbleTextEditor />);
+    act(() => {
+      store().startEditing(store().addBubble({ text: "Bonjour" }));
+    });
+    const steps = store().past.length;
+    fireEvent.blur(screen.getByRole("textbox"));
+    expect(store().editingId).toBeNull();
+    expect(store().past.length).toBe(steps);
+  });
+
+  it("does not delete the bubble when Delete is typed in its text", () => {
+    render(
+      <>
+        <EditorShortcuts />
+        <BubbleTextEditor />
+      </>,
+    );
+    act(() => {
+      store().startEditing(store().addBubble());
+    });
+    fireEvent.keyDown(screen.getByRole("textbox"), { key: "Delete" });
+    fireEvent.keyDown(screen.getByRole("textbox"), { key: "b" });
+    expect(bubbles()).toHaveLength(1);
+    expect(store().tool).toBe("select");
   });
 });

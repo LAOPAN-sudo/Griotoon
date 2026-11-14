@@ -29,6 +29,12 @@ const TOOLS: { tool: Tool; labelKey: MessageKey; shortcut: string; icon: React.R
       </>
     ),
   },
+  {
+    tool: "bubble",
+    labelKey: "toolbar.bubble",
+    shortcut: "B",
+    icon: <path d="M12 4c5 0 9 2.7 9 6s-4 6-9 6c-.8 0-1.6-.1-2.3-.2L5 19l1.2-4.1C4.2 13.8 3 12 3 10c0-3.3 4-6 9-6z" strokeLinejoin="round" />,
+  },
 ];
 
 /** Left tool column. Bubble, sfx and image tools come in later steps. */
@@ -124,7 +130,7 @@ export function Toolbar() {
           ref={popoverRef}
           role="region"
           aria-label={t("templates.title")}
-          className="absolute left-full top-52 ml-2 w-72 rounded-lg border border-zinc-200 bg-white p-3 shadow-lg"
+          className="absolute left-full top-64 ml-2 w-72 rounded-lg border border-zinc-200 bg-white p-3 shadow-lg"
         >
           <h2 className="mb-1 text-sm font-semibold text-zinc-900">{t("templates.title")}</h2>
           <p className="mb-3 text-xs text-zinc-500">{t("templates.help")}</p>
