@@ -18,8 +18,8 @@ Objectif : un éditeur utilisable pour monter une planche avec ses propres image
 - [x] Onomatopées (texte stylisé, rotation)
 - [x] Panneau des calques (ordre z, suppression)
 - [x] Sauvegarde locale automatique (IndexedDB) et restauration
-- [ ] Export PNG de la page
-- [ ] Export PDF (plusieurs pages)
+- [x] Export PNG de la page
+- [ ] Export PDF (plusieurs pages) : fait pour une page, plusieurs pages avec la gestion des pages
 - [ ] Gestion de plusieurs pages dans un chapitre (miniatures, ajout, réordonnancement)
 
 **Validé quand** : on crée une page de 5 cases, on y met des images et 4 bulles, on recharge le navigateur sans rien perdre, et on exporte en PNG et en PDF lisibles.

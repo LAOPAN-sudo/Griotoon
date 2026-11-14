@@ -202,6 +202,16 @@ export const fr = {
   "save.error": "La planche n'a pas pu être enregistrée dans ce navigateur.",
   "save.errorQuota": "Le stockage du navigateur est plein : la planche n'est pas enregistrée. Retire ou remplace des images, ou libère de l'espace.",
 
+  "export.button": "Exporter",
+  "export.menu": "Exporter la planche",
+  "export.png": "Image PNG",
+  "export.pngHelp": "1240 × 1754 px, pour le web et les réseaux sociaux",
+  "export.pdf": "Document PDF",
+  "export.pdfHelp": "Format A4 en 300 dpi, pour imprimer",
+  "export.working": "Export en cours…",
+  "export.error": "L'export a échoué. Réessaie dans un instant.",
+  "export.fileBase": "planche",
+
   "common.cancel": "Annuler",
   "common.close": "Fermer",
   "color.hex": "Code couleur (hexadécimal)",

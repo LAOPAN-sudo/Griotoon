@@ -14,6 +14,7 @@ import { Toast } from "@/components/ui/Toast";
 import { Toolbar } from "./Toolbar";
 import { ZoomControls } from "./ZoomControls";
 import { SaveIndicator } from "./SaveIndicator";
+import { ExportMenu } from "./ExportMenu";
 import { useLocalSave } from "./useLocalSave";
 
 function CanvasLoading() {
@@ -60,6 +61,7 @@ export function Editor() {
           <ShortcutsButton />
           <LanguageSwitcher />
           <SidebarToggle />
+          <ExportMenu />
         </div>
       </header>
 

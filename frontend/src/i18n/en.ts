@@ -200,6 +200,16 @@ export const en: Messages = {
   "save.error": "The page could not be saved in this browser.",
   "save.errorQuota": "The browser storage is full: the page is not saved. Remove or replace some images, or free up space.",
 
+  "export.button": "Export",
+  "export.menu": "Export the page",
+  "export.png": "PNG image",
+  "export.pngHelp": "1240 × 1754 px, for the web and social media",
+  "export.pdf": "PDF document",
+  "export.pdfHelp": "A4 at 300 dpi, for printing",
+  "export.working": "Exporting…",
+  "export.error": "The export failed. Try again in a moment.",
+  "export.fileBase": "page",
+
   "common.cancel": "Cancel",
   "common.close": "Close",
   "color.hex": "Colour code (hexadecimal)",

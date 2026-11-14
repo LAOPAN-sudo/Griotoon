@@ -92,6 +92,7 @@ Le choix d'un gabarit remplace les cases existantes après confirmation (« Remp
 ### Étape 10 : export
 - **PNG** : `stage.toDataURL({ pixelRatio })` sur la page seule (sans l'interface ni le Transformer), à la taille réelle 1240 × 1754.
 - **PDF** : `jspdf`, une page PDF par planche.
+- Mise en œuvre : bouton « Exporter » dans l'en-tête (Image PNG / Document PDF). Les calques de contenu (cases, bulles et onomatopées) sont copiés dans un canvas caché de la taille de la page : ni sélection, ni poignées, ni ombre de la feuille, ni éléments masqués. PNG à la taille réelle ; PDF au format A4 à 300 dpi (image JPEG, quelques centaines de Ko). Fichier nommé `griotoon-planche-AAAA-MM-JJ`. `jspdf` (version 4, sans les failles des versions ≤ 4.2.0) n'est chargé qu'au premier export PDF.
 
 ### Étape 11 : plusieurs pages
 - Barre de miniatures en bas : ajouter, dupliquer, supprimer, réordonner par glisser-déposer.

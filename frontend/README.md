@@ -27,6 +27,7 @@ src/
 ├── i18n/                # traductions : fr.ts (référence), en.ts, useT()
 ├── lib/pageStorage.ts   # sauvegarde locale dans IndexedDB (idb-keyval), vérification avant restauration
 ├── lib/autosave.ts      # sauvegarde automatique : délai de 1 s, écriture immédiate quand l'onglet est caché
+├── lib/exportPage.ts    # export : nom de fichier, taille de la page PDF
 ├── lib/page.ts          # page vide et éléments par défaut (case, bulle, onomatopée)
 ├── lib/bubbles.ts       # formes des bulles (fonctions pures → tracé), zone de texte
 ├── lib/sfx.ts           # onomatopées : tailles, contour, couleurs
