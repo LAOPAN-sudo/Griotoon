@@ -1,6 +1,12 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createStore, type StoreApi } from "zustand/vanilla";
-import { editorStateCreator, HISTORY_LIMIT, type EditorState } from "./editorStore";
+import {
+  DUPLICATE_OFFSET,
+  editorStateCreator,
+  HISTORY_LIMIT,
+  MERGE_WINDOW_MS,
+  type EditorState,
+} from "./editorStore";
 import { createEmptyPage, createPanel } from "@/lib/page";
 
 let store: StoreApi<EditorState>;
@@ -188,5 +194,93 @@ describe("undo / redo", () => {
     expect(s().future).toHaveLength(0);
     expect(s().selectedIds).toEqual([]);
     expect(s().page.panels).toHaveLength(0);
+  });
+});
+
+describe("batch updates, nudge and duplicate", () => {
+  it("updates several elements of different types in one undo step", () => {
+    const p = s().addPanel({ x: 0 });
+    const b = s().addBubble({ x: 0 });
+    const steps = s().past.length;
+    s().updateElements([
+      { id: p, patch: { x: 50 } },
+      { id: b, patch: { x: 70 } },
+    ]);
+    expect(s().page.panels[0].x).toBe(50);
+    expect(s().page.bubbles[0].x).toBe(70);
+    expect(s().past.length).toBe(steps + 1);
+    s().undo();
+    expect(s().page.panels[0].x).toBe(0);
+    expect(s().page.bubbles[0].x).toBe(0);
+  });
+
+  it("records nothing when a batch changes nothing", () => {
+    const p = s().addPanel({ x: 10, y: 20 });
+    const steps = s().past.length;
+    s().updateElements([{ id: p, patch: { x: 10, y: 20 } }]);
+    expect(s().past.length).toBe(steps);
+  });
+
+  it("nudges elements, bubble tails included", () => {
+    const p = s().addPanel({ x: 100, y: 100 });
+    const b = s().addBubble({ x: 10, y: 10, tail: { x: 50, y: 200 } });
+    s().nudge([p, b], 10, -1);
+    expect(s().page.panels[0]).toMatchObject({ x: 110, y: 99 });
+    expect(s().page.bubbles[0]).toMatchObject({ x: 20, y: 9, tail: { x: 60, y: 199 } });
+  });
+
+  it("merges quick repeated nudges into one undo step", () => {
+    const p = s().addPanel({ x: 100 });
+    const steps = s().past.length;
+    for (let i = 0; i < 30; i++) s().nudge([p], 1, 0);
+    expect(s().page.panels[0].x).toBe(130);
+    expect(s().past.length).toBe(steps + 1);
+    s().undo();
+    expect(s().page.panels[0].x).toBe(100);
+  });
+
+  it("starts a new undo step after a pause or another change", () => {
+    vi.useFakeTimers();
+    try {
+      const p = s().addPanel({ x: 0 });
+      s().nudge([p], 1, 0);
+      vi.advanceTimersByTime(MERGE_WINDOW_MS + 1);
+      s().nudge([p], 1, 0);
+      s().updatePanel(p, { w: 10 });
+      s().nudge([p], 1, 0);
+      s().undo();
+      expect(s().page.panels[0].x).toBe(2);
+      s().undo();
+      s().undo();
+      expect(s().page.panels[0].x).toBe(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("duplicates with an offset, on top, and selects the copies", () => {
+    const p = s().addPanel({ x: 100, y: 100 });
+    const b = s().addBubble({ x: 10, y: 10, tail: { x: 50, y: 200 }, text: "Salut" });
+    const ids = s().duplicate([p, b]);
+    expect(ids).toHaveLength(2);
+    expect(s().selectedIds).toEqual(ids);
+    const panelCopy = s().page.panels[1];
+    const bubbleCopy = s().page.bubbles[1];
+    expect(panelCopy).toMatchObject({ x: 100 + DUPLICATE_OFFSET, y: 100 + DUPLICATE_OFFSET, z: 2 });
+    expect(bubbleCopy).toMatchObject({ text: "Salut", z: 3, tail: { x: 70, y: 220 } });
+    expect(panelCopy.id).not.toBe(p);
+    // Copies are independent objects.
+    expect(bubbleCopy.tail).not.toBe(s().page.bubbles[0].tail);
+  });
+
+  it("does nothing when duplicating unknown ids", () => {
+    expect(s().duplicate(["nope"])).toEqual([]);
+    expect(s().past).toHaveLength(0);
+  });
+
+  it("switches tool without touching the history", () => {
+    s().setTool("panel");
+    expect(s().tool).toBe("panel");
+    expect(s().past).toHaveLength(0);
   });
 });

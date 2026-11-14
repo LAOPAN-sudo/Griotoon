@@ -1,16 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-
-function isTyping(target: EventTarget | null): boolean {
-  if (!(target instanceof HTMLElement)) return false;
-  return (
-    target.isContentEditable ||
-    target.tagName === "INPUT" ||
-    target.tagName === "TEXTAREA" ||
-    target.tagName === "SELECT"
-  );
-}
+import { isTypingTarget } from "@/lib/shortcuts";
 
 /** True while the space bar is held (and the user is not typing in a field). */
 export function useSpaceKey(): boolean {
@@ -18,7 +9,7 @@ export function useSpaceKey(): boolean {
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.code !== "Space" || isTyping(e.target)) return;
+      if (e.code !== "Space" || isTypingTarget(e.target)) return;
       e.preventDefault(); // don't scroll the page or "click" a focused button
       setPressed(true);
     };

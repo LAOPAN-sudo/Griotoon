@@ -2,22 +2,11 @@ import { describe, expect, it } from "vitest";
 import { createEmptyPage } from "./page";
 import { getTemplate, slotToGeometry, TEMPLATES, type TemplateId } from "./templates";
 import type { Panel } from "@/types/page";
+import { boundsOf } from "./geometry";
 
 const page = createEmptyPage();
 
-/** Axis-aligned bounding box of a (possibly rotated around its top-left) panel. */
-function bbox(p: Panel) {
-  const r = (p.rotation * Math.PI) / 180;
-  const corners = [
-    [0, 0],
-    [p.w, 0],
-    [0, p.h],
-    [p.w, p.h],
-  ].map(([dx, dy]) => [p.x + dx * Math.cos(r) - dy * Math.sin(r), p.y + dx * Math.sin(r) + dy * Math.cos(r)]);
-  const xs = corners.map((c) => c[0]);
-  const ys = corners.map((c) => c[1]);
-  return { left: Math.min(...xs), top: Math.min(...ys), right: Math.max(...xs), bottom: Math.max(...ys) };
-}
+const bbox = boundsOf;
 
 const expectedCounts: Record<TemplateId, number> = {
   full: 1,

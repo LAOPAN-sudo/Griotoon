@@ -1,12 +1,40 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useT } from "@/i18n";
+import { useT, type MessageKey } from "@/i18n";
+import { useEditorStore, type Tool } from "@/store/editorStore";
 import { TemplatePicker } from "./TemplatePicker";
 
-/** Left tool column. More tools (panel, bubble, sfx, image) come in later steps. */
+const toolButtonClass = (active: boolean) =>
+  `flex flex-col items-center gap-1 rounded-md py-2 text-xs ${
+    active ? "bg-zinc-900 text-white" : "text-zinc-700 hover:bg-zinc-100"
+  }`;
+
+const TOOLS: { tool: Tool; labelKey: MessageKey; shortcut: string; icon: React.ReactNode }[] = [
+  {
+    tool: "select",
+    labelKey: "toolbar.select",
+    shortcut: "V",
+    icon: <path d="M5 3l14 8-6 1.5L10 19z" strokeLinejoin="round" />,
+  },
+  {
+    tool: "panel",
+    labelKey: "toolbar.panel",
+    shortcut: "C",
+    icon: (
+      <>
+        <rect x="4" y="5" width="16" height="14" rx="1" />
+        <path d="M12 9v6M9 12h6" />
+      </>
+    ),
+  },
+];
+
+/** Left tool column. Bubble, sfx and image tools come in later steps. */
 export function Toolbar() {
   const t = useT();
+  const activeTool = useEditorStore((s) => s.tool);
+  const setTool = useEditorStore((s) => s.setTool);
   const [templatesOpen, setTemplatesOpen] = useState(false);
   const popoverRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
@@ -37,15 +65,31 @@ export function Toolbar() {
       aria-label={t("toolbar.label")}
       className="relative z-10 flex w-20 shrink-0 flex-col items-stretch gap-1 border-r border-zinc-200 bg-white p-2"
     >
+      {TOOLS.map(({ tool, labelKey, shortcut, icon }) => (
+        <button
+          key={tool}
+          type="button"
+          aria-pressed={activeTool === tool}
+          title={`${t(labelKey)} (${shortcut})`}
+          onClick={() => setTool(tool)}
+          className={toolButtonClass(activeTool === tool)}
+        >
+          <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={1.8} aria-hidden="true">
+            {icon}
+          </svg>
+          {t(labelKey)}
+        </button>
+      ))}
+
+      <hr className="my-1 border-zinc-200" />
+
       <button
         ref={buttonRef}
         type="button"
         aria-expanded={templatesOpen}
         aria-haspopup="true"
         onClick={() => setTemplatesOpen((open) => !open)}
-        className={`flex flex-col items-center gap-1 rounded-md py-2 text-xs ${
-          templatesOpen ? "bg-zinc-900 text-white" : "text-zinc-700 hover:bg-zinc-100"
-        }`}
+        className={toolButtonClass(templatesOpen)}
       >
         <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={1.8} aria-hidden="true">
           <rect x="3" y="3" width="18" height="18" rx="1" />
@@ -59,7 +103,7 @@ export function Toolbar() {
           ref={popoverRef}
           role="region"
           aria-label={t("templates.title")}
-          className="absolute left-full top-2 ml-2 w-72 rounded-lg border border-zinc-200 bg-white p-3 shadow-lg"
+          className="absolute left-full top-36 ml-2 w-72 rounded-lg border border-zinc-200 bg-white p-3 shadow-lg"
         >
           <h2 className="mb-1 text-sm font-semibold text-zinc-900">{t("templates.title")}</h2>
           <p className="mb-3 text-xs text-zinc-500">{t("templates.help")}</p>

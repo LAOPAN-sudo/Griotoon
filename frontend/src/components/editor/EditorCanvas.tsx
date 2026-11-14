@@ -1,31 +1,57 @@
 "use client";
 
 // Konva canvas of the editor. It only RENDERS the page document from the
-// store; changes to the page always go through editorStore actions.
-// Loaded with next/dynamic({ ssr: false }) because Konva needs a browser.
+// store; every change goes through editorStore actions, committed at the END
+// of a gesture (drag end, transform end, mouse up) so that one gesture = one
+// undo step. Loaded with next/dynamic({ ssr: false }) because Konva needs a browser.
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type Konva from "konva";
-import { Layer, Rect, Stage } from "react-konva";
+import { Layer, Line, Rect, Stage, Transformer } from "react-konva";
 import { useEditorStore } from "@/store/editorStore";
 import { useViewStore } from "@/store/viewStore";
 import { wheelDeltaPixels, wheelZoomFactor } from "@/lib/viewport";
+import { boundsOf, rectFromPoints, type Box } from "@/lib/geometry";
+import { buildSnapTargets, snapBox, snapPoint, SNAP_TOLERANCE_PX, type Guides } from "@/lib/snapping";
 import { useT } from "@/i18n";
+import type { Panel } from "@/types/page";
 import { useSpaceKey } from "./useSpaceKey";
+
+/** Smallest panel size, in page pixels. */
+const MIN_PANEL_SIZE = 40;
+const SELECTION_COLOR = "#2563eb";
+const GUIDE_COLOR = "#ec4899";
+
+type Point = { x: number; y: number };
+
+/** Page coordinates are stored as whole pixels (no 629.9999… in the JSON). */
+const px = Math.round;
+/** Rotation is stored with one decimal. */
+const deg = (r: number) => Math.round(r * 10) / 10;
 
 export default function EditorCanvas() {
   const t = useT();
   const containerRef = useRef<HTMLDivElement>(null);
+  const stageRef = useRef<Konva.Stage>(null);
+  const transformerRef = useRef<Konva.Transformer>(null);
+
   const page = useEditorStore((s) => s.page);
+  const selectedIds = useEditorStore((s) => s.selectedIds);
+  const tool = useEditorStore((s) => s.tool);
   const view = useViewStore((s) => s.view);
   const viewport = useViewStore((s) => s.viewport);
   const spacePressed = useSpaceKey();
+
   const [isPanning, setIsPanning] = useState(false);
+  const [guides, setGuides] = useState<Guides>({});
+  const [draft, setDraft] = useState<{ start: Point; end: Point } | null>(null);
 
   const pageSize = useMemo(
     () => ({ width: page.width, height: page.height }),
     [page.width, page.height],
   );
+
+  // ---------------------------------------------------------------- viewport
 
   // Measure the canvas area and follow its size (window resize, side panels…).
   useEffect(() => {
@@ -72,9 +98,193 @@ export default function EditorCanvas() {
     useViewStore.getState().setPosition(stage.x(), stage.y());
   };
 
-  const panels = useMemo(() => [...page.panels].sort((a, b) => a.z - b.z), [page.panels]);
+  // --------------------------------------------------------------- selection
 
-  const cursor = isPanning ? "grabbing" : spacePressed ? "grab" : "default";
+  const panels = useMemo(() => [...page.panels].sort((a, b) => a.z - b.z), [page.panels]);
+  const selectedPanelIds = useMemo(() => {
+    const ids = new Set(page.panels.map((p) => p.id));
+    return selectedIds.filter((id) => ids.has(id));
+  }, [page.panels, selectedIds]);
+
+  // Attach the Transformer (selection handles) to the selected Konva nodes.
+  useEffect(() => {
+    const transformer = transformerRef.current;
+    const stage = stageRef.current;
+    if (!transformer || !stage) return;
+    const nodes = selectedPanelIds
+      .map((id) => stage.findOne(`#${id}`))
+      .filter((n): n is Konva.Node => !!n);
+    transformer.nodes(nodes);
+    transformer.getLayer()?.batchDraw();
+  }, [selectedPanelIds, page.panels]);
+
+  const canEdit = tool === "select" && !spacePressed;
+
+  // ---------------------------------------------------------------- snapping
+
+  /** Snap targets, ignoring the panels being moved. In page pixels. */
+  const targetsWithout = useCallback(
+    (excluded: string[]) => {
+      const { page } = useEditorStore.getState();
+      const others: Box[] = page.panels.filter((p) => !excluded.includes(p.id)).map(boundsOf);
+      return buildSnapTargets(page, others);
+    },
+    [],
+  );
+
+  const tolerance = () => SNAP_TOLERANCE_PX / useViewStore.getState().view.scale;
+
+  const toPage = (abs: Point): Point => {
+    const v = useViewStore.getState().view;
+    return { x: (abs.x - v.x) / v.scale, y: (abs.y - v.y) / v.scale };
+  };
+  const toScreen = (p: Point): Point => {
+    const v = useViewStore.getState().view;
+    return { x: p.x * v.scale + v.x, y: p.y * v.scale + v.y };
+  };
+
+  /** dragBoundFunc for a panel: snaps when it is dragged alone. */
+  const panelDragBound = (panel: Panel) =>
+    function (this: Konva.Node, absPos: Point): Point {
+      const multi = (transformerRef.current?.nodes().length ?? 0) > 1;
+      if (multi) return absPos; // moving a group: no snapping (keeps the group intact)
+      const pos = toPage(absPos);
+      const box = boundsOf({ ...panel, x: pos.x, y: pos.y });
+      const snap = snapBox(box, targetsWithout([panel.id]), tolerance());
+      setGuides((g) => (g.x === snap.guides.x && g.y === snap.guides.y ? g : snap.guides));
+      return toScreen({ x: pos.x + snap.dx, y: pos.y + snap.dy });
+    };
+
+  // ------------------------------------------------------------ drag & resize
+
+  const onPanelPointerDown = (panel: Panel, e: Konva.KonvaEventObject<MouseEvent | TouchEvent>) => {
+    if (!canEdit) return;
+    const additive = "shiftKey" in e.evt && e.evt.shiftKey;
+    const { selectedIds, select } = useEditorStore.getState();
+    if (additive) select(panel.id, true);
+    else if (!selectedIds.includes(panel.id)) select(panel.id);
+  };
+
+  /**
+   * Commit the positions of every moved node in one undo step. With several
+   * panels selected, each one fires dragend: the first call saves them all,
+   * the next ones change nothing and add no history entry.
+   */
+  const onPanelDragEnd = (e: Konva.KonvaEventObject<DragEvent>) => {
+    setGuides({});
+    const nodes = new Set([...(transformerRef.current?.nodes() ?? []), e.target]);
+    const patches = [...nodes].map((node) => {
+      const patch = { x: px(node.x()), y: px(node.y()) };
+      // If the rounded value equals the previous one, React won't touch the
+      // node: align it ourselves so the canvas matches the stored page.
+      node.position(patch);
+      return { id: node.id(), patch };
+    });
+    useEditorStore.getState().updateElements(patches);
+  };
+
+  /** Bake the Transformer's scale into width/height, then commit. */
+  const onTransformEnd = () => {
+    setGuides({});
+    const nodes = transformerRef.current?.nodes() ?? [];
+    const patches = nodes.map((node) => {
+      const patch = {
+        x: px(node.x()),
+        y: px(node.y()),
+        w: px(Math.max(MIN_PANEL_SIZE, node.width() * node.scaleX())),
+        h: px(Math.max(MIN_PANEL_SIZE, node.height() * node.scaleY())),
+        rotation: deg(node.rotation()),
+      };
+      node.setAttrs({
+        x: patch.x,
+        y: patch.y,
+        width: patch.w,
+        height: patch.h,
+        rotation: patch.rotation,
+        scaleX: 1,
+        scaleY: 1,
+      });
+      return { id: node.id(), patch };
+    });
+    useEditorStore.getState().updateElements(patches);
+  };
+
+  /** Snap the dragged resize handle (unrotated panels only). */
+  const anchorDragBound = (_old: Point, next: Point): Point => {
+    const nodes = transformerRef.current?.nodes() ?? [];
+    if (nodes.some((n) => n.rotation() !== 0)) return next;
+    const snapped = snapPoint(toPage(next), targetsWithout(nodes.map((n) => n.id())), tolerance());
+    setGuides(snapped.guides);
+    return toScreen(snapped);
+  };
+
+  // ---------------------------------------------------- panel tool (drawing)
+
+  const pointerOnPage = (): Point | null => stageRef.current?.getRelativePointerPosition() ?? null;
+
+  const onStagePointerDown = (e: Konva.KonvaEventObject<PointerEvent>) => {
+    if (spacePressed) return;
+    if (tool === "panel") {
+      const p = pointerOnPage();
+      if (!p) return;
+      const start = snapPoint(p, targetsWithout([]), tolerance());
+      setDraft({ start, end: start });
+      return;
+    }
+    // Click on an empty area: clear the selection (unless Shift is held).
+    if (e.target === e.target.getStage() && !e.evt.shiftKey) {
+      useEditorStore.getState().select(null);
+    }
+  };
+
+  const onStagePointerMove = () => {
+    if (!draft) return;
+    const p = pointerOnPage();
+    if (!p) return;
+    const end = snapPoint(p, targetsWithout([]), tolerance());
+    setGuides(end.guides);
+    setDraft({ ...draft, end });
+  };
+
+  const finishDrawing = () => {
+    if (!draft) return;
+    const rect = rectFromPoints(draft.start, draft.end);
+    setDraft(null);
+    setGuides({});
+    if (rect.w < MIN_PANEL_SIZE || rect.h < MIN_PANEL_SIZE) return; // a click, not a drawing
+    const store = useEditorStore.getState();
+    const id = store.addPanel({ x: px(rect.x), y: px(rect.y), w: px(rect.w), h: px(rect.h) });
+    store.select(id);
+    store.setTool("select");
+  };
+
+  // Releasing the mouse outside the canvas must also end the drawing.
+  const finishDrawingRef = useRef(finishDrawing);
+  useEffect(() => {
+    finishDrawingRef.current = finishDrawing;
+  });
+  const isDrawing = draft !== null;
+  useEffect(() => {
+    if (!isDrawing) return;
+    const onUp = () => finishDrawingRef.current();
+    window.addEventListener("pointerup", onUp);
+    return () => window.removeEventListener("pointerup", onUp);
+  }, [isDrawing]);
+
+  const draftRect = draft ? rectFromPoints(draft.start, draft.end) : null;
+
+  // ------------------------------------------------------------------ render
+
+  const cursor = isPanning
+    ? "grabbing"
+    : spacePressed
+      ? "grab"
+      : tool === "panel"
+        ? "crosshair"
+        : "default";
+
+  /** Guide lines extend a little beyond the page. */
+  const extent = Math.max(page.width, page.height) * 2;
 
   return (
     <div
@@ -86,6 +296,7 @@ export default function EditorCanvas() {
     >
       {viewport.width > 0 && viewport.height > 0 && (
         <Stage
+          ref={stageRef}
           width={viewport.width}
           height={viewport.height}
           x={view.x}
@@ -93,12 +304,17 @@ export default function EditorCanvas() {
           scaleX={view.scale}
           scaleY={view.scale}
           draggable={spacePressed}
-          onDragStart={() => setIsPanning(true)}
+          onDragStart={(e) => {
+            if (e.target === e.target.getStage()) setIsPanning(true);
+          }}
           onDragMove={onStageDrag}
           onDragEnd={(e) => {
+            if (e.target !== e.target.getStage()) return;
             onStageDrag(e);
             setIsPanning(false);
           }}
+          onPointerDown={onStagePointerDown}
+          onPointerMove={onStagePointerMove}
         >
           <Layer name="panelsLayer">
             {/* The page sheet: coordinates are page pixels (1240 × 1754 for A4). */}
@@ -117,6 +333,7 @@ export default function EditorCanvas() {
               <Rect
                 key={panel.id}
                 id={panel.id}
+                name="panel"
                 x={panel.x}
                 y={panel.y}
                 width={panel.w}
@@ -125,12 +342,71 @@ export default function EditorCanvas() {
                 stroke={panel.border.color}
                 strokeWidth={panel.border.width}
                 fill="#FFFFFF"
+                listening={tool === "select"}
+                draggable={canEdit}
+                dragBoundFunc={panelDragBound(panel)}
+                onPointerDown={(e) => onPanelPointerDown(panel, e)}
+                onDragEnd={onPanelDragEnd}
               />
             ))}
           </Layer>
-          {/* Filled in later steps: bubbles and sfx, then selection handles. */}
+
+          {/* Filled in later steps: bubbles and sfx. */}
           <Layer name="bubblesLayer" />
-          <Layer name="uiLayer" />
+
+          <Layer name="uiLayer">
+            {draftRect && (
+              <Rect
+                {...draftRect}
+                width={draftRect.w}
+                height={draftRect.h}
+                stroke={SELECTION_COLOR}
+                strokeWidth={2}
+                strokeScaleEnabled={false}
+                dash={[6, 4]}
+                fill="rgba(37, 99, 235, 0.08)"
+                listening={false}
+              />
+            )}
+            {guides.x !== undefined && (
+              <Line
+                points={[guides.x, -extent, guides.x, extent]}
+                stroke={GUIDE_COLOR}
+                strokeWidth={1}
+                strokeScaleEnabled={false}
+                listening={false}
+              />
+            )}
+            {guides.y !== undefined && (
+              <Line
+                points={[-extent, guides.y, extent, guides.y]}
+                stroke={GUIDE_COLOR}
+                strokeWidth={1}
+                strokeScaleEnabled={false}
+                listening={false}
+              />
+            )}
+            <Transformer
+              ref={transformerRef}
+              visible={tool === "select"}
+              ignoreStroke
+              flipEnabled={false}
+              keepRatio={false}
+              rotationSnaps={[0, 90, 180, 270]}
+              rotationSnapTolerance={4}
+              rotateAnchorOffset={24}
+              anchorSize={10}
+              anchorCornerRadius={2}
+              anchorStroke={SELECTION_COLOR}
+              borderStroke={SELECTION_COLOR}
+              anchorDragBoundFunc={anchorDragBound}
+              boundBoxFunc={(oldBox, newBox) => {
+                const min = MIN_PANEL_SIZE * useViewStore.getState().view.scale;
+                return Math.abs(newBox.width) < min || Math.abs(newBox.height) < min ? oldBox : newBox;
+              }}
+              onTransformEnd={onTransformEnd}
+            />
+          </Layer>
         </Stage>
       )}
     </div>

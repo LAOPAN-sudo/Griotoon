@@ -1,15 +1,26 @@
 import { create, type StateCreator } from "zustand";
 import { produce, type Draft } from "immer";
-import type { Bubble, Page, Panel, Sfx } from "@/types/page";
-import { allElements, createBubble, createEmptyPage, createPanel, createSfx } from "@/lib/page";
+import { nanoid } from "nanoid";
+import type { Bubble, Page, PageElement, Panel, Sfx } from "@/types/page";
+import { allElements, createBubble, createEmptyPage, createPanel, createSfx, nextZ } from "@/lib/page";
 
 export const HISTORY_LIMIT = 100;
+/** Consecutive changes with the same merge key within this delay form one undo step. */
+export const MERGE_WINDOW_MS = 1000;
+/** Offset of duplicated elements, in page pixels. */
+export const DUPLICATE_OFFSET = 20;
 
 type Patch<T> = Partial<Omit<T, "id">>;
+/** Patch for any element type (panel, bubble or sfx). */
+export type ElementPatch = Patch<Panel> | Patch<Bubble> | Patch<Sfx>;
+
+/** Active editor tool. Bubble, sfx and image tools come in later steps. */
+export type Tool = "select" | "panel";
 
 export interface EditorState {
   page: Page;
   selectedIds: string[];
+  tool: Tool;
   /** Previous page snapshots, oldest first. */
   past: Page[];
   /** Undone snapshots, most recently undone last. */
@@ -24,6 +35,12 @@ export interface EditorState {
   updateBubble: (id: string, patch: Patch<Bubble>) => void;
   addSfx: (props?: Partial<Sfx>) => string;
   updateSfx: (id: string, patch: Patch<Sfx>) => void;
+  /** Update several elements of any type in a single undo step. */
+  updateElements: (patches: { id: string; patch: ElementPatch }[], mergeKey?: string) => void;
+  /** Move elements by (dx, dy). Repeated nudges of the same selection merge into one undo step. */
+  nudge: (ids: string[], dx: number, dy: number) => void;
+  /** Copy elements with a small offset and select the copies. Returns the new ids. */
+  duplicate: (ids: string[]) => string[];
   /** Remove panels, bubbles or sfx by id. */
   removeElement: (ids: string | string[]) => void;
   /** Replace all panels with the ones produced by a layout template. */
@@ -33,6 +50,8 @@ export interface EditorState {
 
   /** Select ids. With `additive`, toggle them in the current selection (Shift+click). */
   select: (ids: string | string[] | null, additive?: boolean) => void;
+
+  setTool: (tool: Tool) => void;
 
   undo: () => void;
   redo: () => void;
@@ -47,24 +66,45 @@ export const editorStateCreator: StateCreator<EditorState> = (set, get) => {
    * Immer gives us immutable snapshots with structural sharing, so keeping
    * 100 of them stays cheap.
    */
-  const commit = (recipe: (draft: Draft<Page>) => void) => {
+  let lastMerge: { key: string; time: number } | null = null;
+
+  const commit = (recipe: (draft: Draft<Page>) => void, mergeKey?: string) => {
     const { page, past } = get();
     const next = produce(page, recipe);
     if (next === page) return; // nothing changed: no history entry
+
+    const now = Date.now();
+    const merge =
+      mergeKey !== undefined &&
+      lastMerge?.key === mergeKey &&
+      now - lastMerge.time < MERGE_WINDOW_MS &&
+      past.length > 0;
+    lastMerge = mergeKey === undefined ? null : { key: mergeKey, time: now };
+
     set({
       page: next,
-      past: [...past, page].slice(-HISTORY_LIMIT),
+      // When merging, the step before the first change stays the undo target.
+      past: merge ? past : [...past, page].slice(-HISTORY_LIMIT),
       future: [],
     });
   };
 
+  const findElement = (d: Draft<Page>, id: string): Draft<PageElement> | undefined =>
+    d.panels.find((p) => p.id === id) ??
+    d.bubbles.find((b) => b.id === id) ??
+    d.sfx.find((s) => s.id === id);
+
   return {
     page: createEmptyPage(),
     selectedIds: [],
+    tool: "select",
     past: [],
     future: [],
 
-    loadPage: (page) => set({ page, selectedIds: [], past: [], future: [] }),
+    loadPage: (page) => {
+      lastMerge = null;
+      set({ page, selectedIds: [], past: [], future: [] });
+    },
 
     addPanel: (props) => {
       const panel = createPanel(get().page, props);
@@ -107,6 +147,69 @@ export const editorStateCreator: StateCreator<EditorState> = (set, get) => {
         const sfx = d.sfx.find((s) => s.id === id);
         if (sfx) Object.assign(sfx, patch);
       }),
+
+    updateElements: (patches, mergeKey) =>
+      commit((d) => {
+        for (const { id, patch } of patches) {
+          const el = findElement(d, id);
+          if (!el) continue;
+          // Only assign changed values so that a no-op leaves the page untouched.
+          for (const [key, value] of Object.entries(patch)) {
+            const k = key as keyof typeof el;
+            if (el[k] !== value) (el as Record<string, unknown>)[key] = value;
+          }
+        }
+      }, mergeKey),
+
+    nudge: (ids, dx, dy) => {
+      if (ids.length === 0 || (dx === 0 && dy === 0)) return;
+      commit((d) => {
+        for (const id of ids) {
+          const el = findElement(d, id);
+          if (!el) continue;
+          el.x += dx;
+          el.y += dy;
+          if ("tail" in el && el.tail) {
+            el.tail.x += dx;
+            el.tail.y += dy;
+          }
+        }
+      }, `nudge:${[...ids].sort().join(",")}`);
+    },
+
+    duplicate: (ids) => {
+      const { page } = get();
+      const wanted = new Set(ids);
+      const sources = allElements(page)
+        .filter((el) => wanted.has(el.id))
+        .sort((a, b) => a.z - b.z); // keep their relative order, on top of everything
+      if (sources.length === 0) return [];
+
+      let z = nextZ(page);
+      const copies = sources.map((el) => {
+        const copy = structuredClone(el) as PageElement;
+        copy.id = nanoid(8);
+        copy.x += DUPLICATE_OFFSET;
+        copy.y += DUPLICATE_OFFSET;
+        copy.z = z++;
+        if ("tail" in copy && copy.tail) {
+          copy.tail = { x: copy.tail.x + DUPLICATE_OFFSET, y: copy.tail.y + DUPLICATE_OFFSET };
+        }
+        return copy;
+      });
+      const panelIds = new Set(page.panels.map((p) => p.id));
+      const bubbleIds = new Set(page.bubbles.map((b) => b.id));
+      commit((d) => {
+        sources.forEach((source, i) => {
+          if (panelIds.has(source.id)) d.panels.push(copies[i] as Panel);
+          else if (bubbleIds.has(source.id)) d.bubbles.push(copies[i] as Bubble);
+          else d.sfx.push(copies[i] as Sfx);
+        });
+      });
+      const newIds = copies.map((c) => c.id);
+      set({ selectedIds: newIds });
+      return newIds;
+    },
 
     removeElement: (ids) => {
       const toRemove = new Set(toArray(ids));
@@ -164,7 +267,10 @@ export const editorStateCreator: StateCreator<EditorState> = (set, get) => {
       set({ selectedIds: [...current] });
     },
 
+    setTool: (tool) => set({ tool }),
+
     undo: () => {
+      lastMerge = null;
       const { page, past, future, selectedIds } = get();
       const previous = past.at(-1);
       if (!previous) return;
@@ -178,6 +284,7 @@ export const editorStateCreator: StateCreator<EditorState> = (set, get) => {
     },
 
     redo: () => {
+      lastMerge = null;
       const { page, past, future, selectedIds } = get();
       const next = future.at(-1);
       if (!next) return;
