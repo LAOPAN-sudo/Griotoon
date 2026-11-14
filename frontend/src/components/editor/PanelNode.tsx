@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import type Konva from "konva";
 import { Group, Image as KonvaImage, Rect } from "react-konva";
 import type { Panel, PanelImage } from "@/types/page";
+import { PANEL_FILL_DEFAULT } from "@/lib/page";
 
 // Decoded images, shared by every panel showing the same src (duplicates,
 // undo/redo) so a dataURL is decoded only once.
@@ -66,7 +67,7 @@ interface PanelNodeProps {
 }
 
 /**
- * A panel: white background, image clipped to the panel shape, then the
+ * A panel: background colour (white by default), image clipped to the panel shape, then the
  * border on top. The Group carries the id, position and rotation; the
  * Transformer resizes it by scaling, which EditorCanvas bakes into w/h.
  */
@@ -97,7 +98,7 @@ export function PanelNode({
       onDblClick={onDblClick}
       onDblTap={onDblClick}
     >
-      <Rect width={panel.w} height={panel.h} fill="#FFFFFF" />
+      <Rect width={panel.w} height={panel.h} fill={panel.fill ?? PANEL_FILL_DEFAULT} />
       {image && element && (
         // Draw only the visible part of the image, exactly the panel's size.
         // (Clipping a bigger image would make the selection frame as big as

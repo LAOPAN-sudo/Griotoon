@@ -141,7 +141,7 @@ export function Toolbar() {
           ref={popoverRef}
           role="region"
           aria-label={t("templates.title")}
-          className="absolute left-full top-80 ml-2 w-72 rounded-lg border border-zinc-200 bg-white p-3 shadow-lg"
+          className="absolute left-full top-2 ml-2 max-h-[calc(100%-1rem)] w-80 overflow-y-auto overscroll-contain rounded-lg border border-zinc-200 bg-white p-3 shadow-lg"
         >
           <h2 className="mb-1 text-sm font-semibold text-zinc-900">{t("templates.title")}</h2>
           <p className="mb-3 text-xs text-zinc-500">{t("templates.help")}</p>

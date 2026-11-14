@@ -24,11 +24,15 @@ export interface Panel {
   h: number;
   rotation: number;
   border: { width: number; color: string };
+  /** Background colour inside the panel, under the image (white when absent). */
+  fill?: string;
   image: PanelImage | null;
   /** Character ids, used by AI generation (phases 3 and 4). */
   characters: string[];
   /** Scene description, used by AI generation (phases 2 and 3). */
   description?: string;
+  /** Hidden in the editor and in exports (still listed in the layers). */
+  hidden?: boolean;
   z: number;
 }
 
@@ -48,6 +52,7 @@ export interface Bubble {
   fontSize: number;
   align: "left" | "center" | "right";
   panelId?: string;
+  hidden?: boolean;
   z: number;
 }
 
@@ -63,6 +68,7 @@ export interface Sfx {
   color: string;
   /** Outline colour; its thickness follows fontSize (see lib/sfx.ts). */
   strokeColor: string;
+  hidden?: boolean;
   z: number;
 }
 

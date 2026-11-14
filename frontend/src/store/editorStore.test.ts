@@ -415,3 +415,28 @@ describe("bubbles", () => {
     expect(s().editingId).toBeNull();
   });
 });
+
+describe("page settings and hidden elements", () => {
+  it("updates page settings in one step and ignores no-ops", () => {
+    s().updatePage({ margin: 80, gutter: 30, background: "#FFF8E7" });
+    expect(s().page).toMatchObject({ margin: 80, gutter: 30, background: "#FFF8E7" });
+    const steps = s().past.length;
+    s().updatePage({ margin: 80 });
+    expect(s().past.length).toBe(steps);
+    s().undo();
+    expect(s().page.margin).toBe(60);
+  });
+
+  it("hides and shows elements, deselecting hidden ones", () => {
+    const p = s().addPanel();
+    const b = s().addBubble();
+    s().select([p, b]);
+    s().setHidden([p], true);
+    expect(s().page.panels[0].hidden).toBe(true);
+    expect(s().selectedIds).toEqual([b]);
+    s().setHidden([p], false);
+    expect("hidden" in s().page.panels[0]).toBe(false); // no "hidden: false" left in the JSON
+    s().undo();
+    expect(s().page.panels[0].hidden).toBe(true);
+  });
+});

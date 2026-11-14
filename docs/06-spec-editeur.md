@@ -80,6 +80,9 @@ Le choix d'un gabarit remplace les cases existantes après confirmation (« Remp
 ### Étape 8 : calques et propriétés
 - Liste de tous les éléments triés par `z`, avec glisser pour réordonner, une icône œil (masquer) et une corbeille.
 - Panneau des propriétés contextuel : bordure de la case, police et taille de la bulle, couleur de l'onomatopée…
+- Calques en deux groupes (bulles et onomatopées au-dessus, cases en dessous, décision n° 10), réordonnables à l'intérieur de chaque groupe (glisser, ou Alt + flèches au clavier).
+- Sans sélection, le panneau affiche les réglages de la page (fond, marge, gouttière). Les barres flottantes des bulles et des onomatopées sont remplacées par ce panneau ; seule la barre de recadrage reste flottante.
+- Couleur de fond propre à chaque case (champ `fill`, blanc par défaut), dessinée sous l'image : flashback en sépia, case noire pour un moment dramatique, bleu nuit, etc. Pas de dégradés ni de trames en phase 1.
 
 ### Étape 9 : sauvegarde locale
 - Sauvegarde automatique avec un délai de 1 s après chaque modification, dans IndexedDB (`idb-keyval`).

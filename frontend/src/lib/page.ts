@@ -6,6 +6,8 @@ import { DEFAULT_SFX_FONT_SIZE, DEFAULT_SFX_TEXT } from "./sfx";
 /** A4 at 150 dpi. */
 export const PAGE_WIDTH = 1240;
 export const PAGE_HEIGHT = 1754;
+/** Panel background when `fill` is absent. */
+export const PANEL_FILL_DEFAULT = "#FFFFFF";
 
 export function createEmptyPage(): Page {
   return {

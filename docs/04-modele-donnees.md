@@ -83,6 +83,8 @@ CREATE TABLE generation_jobs (
 
 Coordonnées en **pixels de la page** (origine en haut à gauche). Le canvas met l'affichage à l'échelle.
 
+Ordre d'affichage : les bulles et les onomatopées sont toujours dessinées au-dessus des cases (décision n° 10). `z` ordonne les éléments à l'intérieur de chacun de ces deux groupes.
+
 ```jsonc
 {
   "version": 1,
@@ -97,6 +99,7 @@ Coordonnées en **pixels de la page** (origine en haut à gauche). Le canvas met
       "x": 60, "y": 60, "w": 1120, "h": 500,
       "rotation": 0,
       "border": { "width": 4, "color": "#000000" },
+      "fill": "#1E2A4A",                 // fond de la case, sous l'image (facultatif, blanc par défaut)
       "image": {                         // null si la case est vide
         "src": "https://…/img.webp",     // phase 1 : dataURL WebP ; phase 2 : URL MinIO
         "width": 1600, "height": 1200,   // taille réelle de l'image stockée, en pixels
@@ -105,6 +108,7 @@ Coordonnées en **pixels de la page** (origine en haut à gauche). Le canvas met
       },
       "characters": ["char_uuid_1"],     // utilisé par la génération IA (phases 3 et 4)
       "description": "Plan large : Awa arrive au marché de Ouaga au lever du soleil",
+      "hidden": false,                   // masqué dans l'éditeur et à l'export (facultatif, vaut false par défaut)
       "z": 0
     }
   ],
@@ -143,20 +147,22 @@ export interface PanelImage {
 export interface Panel {
   id: string; x: number; y: number; w: number; h: number; rotation: number;
   border: { width: number; color: string };
+  fill?: string;                                // fond de la case (blanc si absent)
   image: PanelImage | null;
-  characters: string[]; description?: string; z: number;
+  characters: string[]; description?: string; hidden?: boolean; z: number;
 }
 export interface Bubble {
   id: string; type: BubbleType; x: number; y: number; w: number; h: number; rotation: number;
   tail?: { x: number; y: number }; text: string;
   fontFamily: string; fontSize: number; align: 'left' | 'center' | 'right';
-  panelId?: string; z: number;
+  panelId?: string; hidden?: boolean; z: number;
 }
 export interface Sfx {
   id: string; text: string; x: number; y: number;   // (x, y) = coin haut gauche, centre de rotation (comme Konva)
   fontSize: number; rotation: number;
   color: string;        // couleur du texte
   strokeColor: string;  // couleur du contour (épaisseur proportionnelle à fontSize)
+  hidden?: boolean;
   z: number;
 }
 export interface Page {

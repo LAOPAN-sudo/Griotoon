@@ -15,6 +15,10 @@ interface UiState {
   shortcutsOpen: boolean;
   setShortcutsOpen: (open: boolean) => void;
 
+  /** Right column (properties + layers). */
+  sidebarOpen: boolean;
+  setSidebarOpen: (open: boolean) => void;
+
   /** Short message shown at the bottom of the screen (errors, progress). */
   notice: Notice | null;
   notify: (kind: Notice["kind"], messageKey: MessageKey, params?: Notice["params"]) => number;
@@ -27,6 +31,9 @@ let nextNoticeId = 1;
 export const useUiStore = create<UiState>()((set, get) => ({
   shortcutsOpen: false,
   setShortcutsOpen: (shortcutsOpen) => set({ shortcutsOpen }),
+
+  sidebarOpen: true,
+  setSidebarOpen: (sidebarOpen) => set({ sidebarOpen }),
 
   notice: null,
   notify: (kind, messageKey, params) => {

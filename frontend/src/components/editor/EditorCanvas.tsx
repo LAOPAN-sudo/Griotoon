@@ -138,14 +138,18 @@ export default function EditorCanvas() {
 
   // --------------------------------------------------------------- selection
 
-  const panels = useMemo(() => [...page.panels].sort((a, b) => a.z - b.z), [page.panels]);
+  // Hidden elements (layers panel eye) are not drawn, so they can't be clicked either.
+  const visiblePanels = useMemo(() => page.panels.filter((p) => !p.hidden), [page.panels]);
+  const panels = useMemo(() => [...visiblePanels].sort((a, b) => a.z - b.z), [visiblePanels]);
   /** Bubbles and sound effects share a layer, stacked by z. */
   const texts = useMemo(
     () =>
       [
         ...page.bubbles.map((b) => ({ kind: "bubble" as const, el: b })),
         ...page.sfx.map((x) => ({ kind: "sfx" as const, el: x })),
-      ].sort((a, b) => a.el.z - b.el.z),
+      ]
+        .filter((item) => !item.el.hidden)
+        .sort((a, b) => a.el.z - b.el.z),
     [page.bubbles, page.sfx],
   );
   /** Selected elements that have a Konva node the Transformer can hold. */
@@ -179,7 +183,9 @@ export default function EditorCanvas() {
   const targetsWithout = useCallback(
     (excluded: string[]) => {
       const { page } = useEditorStore.getState();
-      const others: Box[] = page.panels.filter((p) => !excluded.includes(p.id)).map(boundsOf);
+      const others: Box[] = page.panels
+        .filter((p) => !p.hidden && !excluded.includes(p.id))
+        .map(boundsOf);
       return buildSnapTargets(page, others);
     },
     [],
@@ -245,7 +251,7 @@ export default function EditorCanvas() {
           x,
           y,
           tail: bubble.tail && { x: bubble.tail.x + dx, y: bubble.tail.y + dy },
-          panelId: topmostAt(page.panels, center)?.id,
+          panelId: topmostAt(page.panels.filter((p) => !p.hidden), center)?.id,
         },
       };
     });
@@ -379,7 +385,7 @@ export default function EditorCanvas() {
       ...box,
       type,
       tail: type === "narration" ? undefined : { x: px(tail.x), y: px(tail.y) },
-      panelId: topmostAt(store.page.panels, p)?.id,
+      panelId: topmostAt(store.page.panels.filter((x) => !x.hidden), p)?.id,
     });
     store.startEditing(id); // also selects it and goes back to the Select tool
   };
@@ -467,7 +473,7 @@ export default function EditorCanvas() {
     if (!isFileDrag(e)) return;
     e.preventDefault(); // allow dropping
     e.dataTransfer.dropEffect = "copy";
-    const target = topmostAt(useEditorStore.getState().page.panels, pagePointOf(e));
+    const target = topmostAt(useEditorStore.getState().page.panels.filter((p) => !p.hidden), pagePointOf(e));
     setDropTargetId(target?.id ?? null);
   };
 
@@ -476,7 +482,7 @@ export default function EditorCanvas() {
     e.preventDefault();
     setDropTargetId(null);
     const file = e.dataTransfer.files[0];
-    const target = topmostAt(useEditorStore.getState().page.panels, pagePointOf(e));
+    const target = topmostAt(useEditorStore.getState().page.panels.filter((p) => !p.hidden), pagePointOf(e));
     if (!file) return;
     if (!target) {
       useUiStore.getState().notify("error", "image.errorDropOutside");

@@ -14,7 +14,7 @@ function TemplateThumbnail({ template, page }: { template: Template; page: Page 
   return (
     <svg
       viewBox={`0 0 ${page.width} ${page.height}`}
-      className="h-24 w-auto rounded-sm bg-white shadow-sm ring-1 ring-zinc-200"
+      className="h-20 w-auto rounded-sm bg-white shadow-sm ring-1 ring-zinc-200"
       aria-hidden="true"
     >
       {panels.map((p) => (
@@ -68,7 +68,7 @@ export function TemplatePicker({ onDone }: TemplatePickerProps) {
 
   return (
     <>
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-3 gap-2">
         {TEMPLATES.map((template) => (
           <button
             key={template.id}

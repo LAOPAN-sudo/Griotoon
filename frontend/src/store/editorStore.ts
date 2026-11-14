@@ -69,6 +69,11 @@ export interface EditorState {
 
   setTool: (tool: Tool) => void;
 
+  /** Page settings (background, margin, gutter). */
+  updatePage: (patch: Partial<Pick<Page, "background" | "margin" | "gutter">>) => void;
+  /** Hide or show elements (layers panel eye). Hidden elements are deselected. */
+  setHidden: (ids: string[], hidden: boolean) => void;
+
   /** Change the type of bubbles (adds or removes the tail as needed). Also the default for new ones. */
   setBubbleType: (ids: string[], type: BubbleType) => void;
   /** Open / close the text field of a bubble or sound effect. */
@@ -309,6 +314,26 @@ export const editorStateCreator: StateCreator<EditorState> = (set, get) => {
     setTool: (tool) => {
       get().endCrop();
       set({ tool });
+    },
+
+    updatePage: (patch) =>
+      commit((d) => {
+        for (const [key, value] of Object.entries(patch)) {
+          const k = key as keyof typeof patch;
+          if (value !== undefined && d[k] !== value) (d as Record<string, unknown>)[k] = value;
+        }
+      }),
+
+    setHidden: (ids, hidden) => {
+      const wanted = new Set(ids);
+      commit((d) => {
+        for (const el of [...d.panels, ...d.bubbles, ...d.sfx]) {
+          if (!wanted.has(el.id) || !!el.hidden === hidden) continue;
+          if (hidden) el.hidden = true;
+          else delete el.hidden;
+        }
+      });
+      if (hidden) set({ selectedIds: get().selectedIds.filter((id) => !wanted.has(id)) });
     },
 
     setBubbleType: (ids, type) => {

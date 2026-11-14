@@ -8,8 +8,7 @@ import { EditorShortcuts } from "./EditorShortcuts";
 import { HistoryControls } from "./HistoryControls";
 import { ShortcutsButton, ShortcutsDialog } from "./ShortcutsDialog";
 import { CropBar } from "./CropBar";
-import { BubbleBar } from "./BubbleBar";
-import { SfxBar } from "./SfxBar";
+import { Sidebar, SidebarToggle } from "./sidebar/Sidebar";
 import { ImagePicker } from "./ImagePicker";
 import { Toast } from "@/components/ui/Toast";
 import { Toolbar } from "./Toolbar";
@@ -55,6 +54,7 @@ export function Editor() {
           <ZoomControls />
           <ShortcutsButton />
           <LanguageSwitcher />
+          <SidebarToggle />
         </div>
       </header>
 
@@ -63,9 +63,8 @@ export function Editor() {
         <main className="relative flex-1 bg-zinc-200">
           <EditorCanvas />
           <CropBar />
-          <BubbleBar />
-          <SfxBar />
         </main>
+        <Sidebar />
       </div>
     </div>
   );

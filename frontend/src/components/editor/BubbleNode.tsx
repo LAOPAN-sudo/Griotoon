@@ -1,5 +1,6 @@
 "use client";
 
+import { useLayoutEffect, useRef } from "react";
 import type Konva from "konva";
 import { Group, Shape, Text } from "react-konva";
 import type { Bubble } from "@/types/page";
@@ -37,6 +38,17 @@ export function BubbleNode({
   // The tail is stored in page coordinates; draw it in the bubble's own (rotated) axes.
   const tail = tailToLocal(bubble);
   const box = textBox(type, w, h);
+  const textRef = useRef<Konva.Text>(null);
+
+  // Centre the text on its real height. Konva would silently drop the lines
+  // that don't fit in a fixed-height box; here a too long text overflows the
+  // bubble instead, which shows that the bubble must be enlarged.
+  useLayoutEffect(() => {
+    const node = textRef.current;
+    if (!node) return;
+    node.y(box.y + (box.h - node.height()) / 2);
+    node.getLayer()?.batchDraw();
+  }, [box.y, box.h, box.w, bubble.text, bubble.fontSize, bubble.align, fontFamily, editing]);
 
   return (
     <Group
@@ -67,16 +79,15 @@ export function BubbleNode({
       />
       {!editing && (
         <Text
+          ref={textRef}
           x={box.x}
           y={box.y}
           width={box.w}
-          height={box.h}
           text={bubble.text}
           fontFamily={fontFamily}
           fontSize={bubble.fontSize}
           lineHeight={BUBBLE_LINE_HEIGHT}
           align={bubble.align}
-          verticalAlign="middle"
           wrap="word"
           fill="#111111"
           listening={false}
