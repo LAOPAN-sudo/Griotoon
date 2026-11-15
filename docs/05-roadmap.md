@@ -4,7 +4,7 @@ Coche les cases au fur et à mesure (`[x]`).
 
 ---
 
-## Phase 1 : éditeur de planches sans IA ← **EN COURS**
+## Phase 1 : éditeur de planches sans IA ← **TERMINÉE** (validée le 2026-11-15)
 Objectif : un éditeur utilisable pour monter une planche avec ses propres images. Spec détaillée dans `06-spec-editeur.md`.
 
 - [x] Initialiser le front (Next.js, TypeScript, Tailwind, react-konva, Zustand, Vitest)
@@ -24,7 +24,7 @@ Objectif : un éditeur utilisable pour monter une planche avec ses propres image
 
 **Validé quand** : on crée une page de 5 cases, on y met des images et 4 bulles, on recharge le navigateur sans rien perdre, et on exporte en PNG et en PDF lisibles.
 
-## Phase 2 : backend et découpage du script par l'IA
+## Phase 2 : backend et découpage du script par l'IA ← **PROCHAINE**
 - [ ] Initialiser le backend FastAPI + Alembic + modèles (`04-modele-donnees.md`)
 - [ ] CRUD projets, chapitres, pages ; synchronisation de l'éditeur avec l'API
 - [ ] Stockage des images sur MinIO
