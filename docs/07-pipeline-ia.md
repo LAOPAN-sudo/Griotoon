@@ -110,3 +110,20 @@ Mesure : avec un modèle d'embedding de visages (par exemple InsightFace), calcu
 - Journaliser chaque appel (fournisseur, modèle, coût estimé, durée) dans `generation_jobs.params`.
 - Limite de générations par utilisateur et par jour, configurable dans `.env`.
 - Filtrer les prompts : refuser les personnages protégés connus et les contenus interdits.
+
+## Assistant conversationnel (phase 2, après le découpage simple)
+
+Le découpage simple est un aller simple (histoire → JSON → pages). L'assistant ajoute une discussion par-dessus, pour les créateurs qui ont une idée mais pas encore l'habitude du découpage BD.
+
+### Ce qu'il fait
+- **Écrire l'histoire** : poser des questions (lieu, époque, personnages, ton, public), proposer une suite ou une fin, corriger et reformuler en français (ou en anglais selon la langue de l'interface).
+- **Retoucher le découpage** : « rends la page 3 plus dramatique », « coupe cette scène en deux cases », « ajoute une case de réaction », « traduis les bulles en anglais ».
+- **Ne jamais modifier sans accord** : chaque proposition s'affiche en aperçu (texte modifié, pages et cases touchées) avec « Appliquer » et « Ignorer ». Appliquer = une seule étape d'annulation dans l'éditeur.
+
+### Fonctionnement
+- API Claude avec **outils** (tool use) plutôt que du texte libre : l'assistant appelle `propose_story_edit`, `propose_breakdown`, `propose_breakdown_patch` (opérations sur pages et cases : ajouter, retirer, modifier une description, un dialogue, un cadrage). Les arguments sont validés par Pydantic côté backend, avec le même schéma que le découpage.
+- Contexte envoyé à chaque message : l'histoire, le découpage courant, les fiches personnages (phase 4), la langue de l'interface. Les images ne sont pas envoyées.
+- Réponses en continu (streaming, SSE) pour que la connexion lente reste supportable ; historique de la discussion stocké par chapitre (table `assistant_messages` à ajouter au modèle de données).
+- Le texte des bulles reste du texte (règle n° 3) : l'assistant modifie des dialogues, jamais des images.
+- Coût maîtrisé : limite de messages par chapitre, historique résumé au-delà d'une certaine longueur.
+

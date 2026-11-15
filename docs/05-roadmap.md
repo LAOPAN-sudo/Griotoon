@@ -31,8 +31,13 @@ Objectif : un éditeur utilisable pour monter une planche avec ses propres image
 - [ ] Écran « Script » : l'utilisateur écrit son histoire
 - [ ] `POST /chapters/{id}/breakdown` : le LLM renvoie le découpage en JSON (voir `07-pipeline-ia.md`)
 - [ ] Conversion du découpage en pages (gabarits choisis automatiquement, description et dialogues pré-remplis dans les bulles)
+- [ ] **Assistant IA conversationnel** (après le découpage simple, voir `07-pipeline-ia.md` § Assistant) :
+  - [ ] Panneau de discussion dans l'écran « Script » et dans l'éditeur, réponses en continu (streaming)
+  - [ ] Aide à l'écriture : questions sur le lieu, les personnages et le ton ; propositions de suite ; correction du français
+  - [ ] Retouche du découpage par des demandes (« rends la page 3 plus dramatique », « coupe cette scène en deux cases », « traduis les bulles en anglais »)
+  - [ ] Propositions toujours validées par l'utilisateur avant d'être appliquées (aperçu, puis « Appliquer » = une étape d'annulation)
 
-**Validé quand** : une histoire d'environ 300 mots produit 1 à 2 pages pré-découpées, avec des bulles pré-remplies et éditables.
+**Validé quand** : une histoire d'environ 300 mots produit 1 à 2 pages pré-découpées, avec des bulles pré-remplies et éditables. Pour l'assistant : à partir d'une idée de deux phrases, une discussion de quelques échanges aboutit à une histoire puis à un découpage appliqué, et la demande « rends la page 1 plus dramatique » modifie le découpage sans casser le reste.
 
 ## Phase 3 : génération d'images par case
 - [ ] Worker Celery + `generation_jobs`
