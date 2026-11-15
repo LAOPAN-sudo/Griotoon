@@ -89,8 +89,13 @@ export interface Page {
 /** Any element that can be selected, reordered or deleted on a page. */
 export type PageElement = Panel | Bubble | Sfx;
 
-/** A chapter: ordered pages. Phase 1 edits one chapter, saved in the browser. */
+/** A chapter: number, title, cover and pages. Phase 1 edits one chapter, saved in the browser. */
 export interface Chapter {
   version: 1;
+  number: number;
+  title: string;
+  /** Edited like a page, always first, not numbered. */
+  cover: Page;
+  /** Story pages in reading order (page 1, 2…). Never empty. */
   pages: Page[];
 }

@@ -16,6 +16,10 @@ interface UiState {
   shortcutsOpen: boolean;
   setShortcutsOpen: (open: boolean) => void;
 
+  /** Full-screen chapter overview (all pages, two by two). */
+  overviewOpen: boolean;
+  setOverviewOpen: (open: boolean) => void;
+
   /** Right column (properties + layers). */
   sidebarOpen: boolean;
   setSidebarOpen: (open: boolean) => void;
@@ -37,6 +41,9 @@ let nextNoticeId = 1;
 export const useUiStore = create<UiState>()((set, get) => ({
   shortcutsOpen: false,
   setShortcutsOpen: (shortcutsOpen) => set({ shortcutsOpen }),
+
+  overviewOpen: false,
+  setOverviewOpen: (overviewOpen) => set({ overviewOpen }),
 
   sidebarOpen: true,
   setSidebarOpen: (sidebarOpen) => set({ sidebarOpen }),

@@ -20,14 +20,15 @@ npm run build        # build de production
 src/
 ├── app/                 # routes Next.js (App Router) : / et /editeur
 ├── components/
-│   ├── editor/          # éditeur : Editor, EditorCanvas (Konva), PanelNode, BubbleNode, SfxNode, TextEditor, CropBar, PageStrip (pages), renderPage (rendu hors écran), ExportMenu…
+│   ├── editor/          # éditeur : Editor, EditorCanvas (Konva), PanelNode, BubbleNode, SfxNode, TextEditor, CropBar, PageStrip (barre des pages), ChapterOverview (vue d'ensemble), renderPage (rendu hors écran), ExportMenu…
+│   │   ├── pages/       # miniature de page, glisser-déposer, titre du chapitre (partagés par la barre et la vue d'ensemble)
 │   │   └── sidebar/     # colonne de droite : propriétés, calques, champs de formulaire
 │   ├── LocaleSync.tsx   # restaure la langue choisie, met à jour <html lang>
 │   └── ui/              # boutons, sélecteur de langue…
 ├── i18n/                # traductions : fr.ts (référence), en.ts, useT()
 ├── lib/pageStorage.ts   # sauvegarde locale dans IndexedDB (idb-keyval), vérification avant restauration
 ├── lib/autosave.ts      # sauvegarde automatique : délai de 1 s, écriture immédiate quand l'onglet est caché
-├── lib/chapter.ts       # pages d'un chapitre : copie, nouvelle page, déplacement (fonctions pures)
+├── lib/chapter.ts       # chapitre : couverture, copie, nouvelle page, déplacement, doubles pages (fonctions pures)
 ├── lib/exportPage.ts    # export : nom de fichier, taille de la page PDF
 ├── lib/page.ts          # page vide et éléments par défaut (case, bulle, onomatopée)
 ├── lib/bubbles.ts       # formes des bulles (fonctions pures → tracé), zone de texte
@@ -51,7 +52,7 @@ Organisation cible complète : `../docs/03-architecture.md`.
 ## Règles
 
 - **Traductions** : aucun texte d'interface en dur dans les composants. On ajoute la clé dans `src/i18n/fr.ts` **et** dans `src/i18n/en.ts` (sinon TypeScript refuse de compiler), puis on l'utilise avec `const t = useT(); t("ma.cle")`. Paramètres : `t("home.phase", { phase: 1 })` pour `"Phase {phase}"`.
-- **Store** : toute modification de la page passe par les actions de `editorStore` (jamais de mutation directe des objets Konva). Chaque action crée une étape d'historique ; la sélection n'en crée pas. Le store garde toutes les pages du chapitre (`pages`, `currentPage`) ; `page` est la page affichée, celle que modifient les actions. Une étape d'historique contient toutes les pages (décision n° 12).
+- **Store** : toute modification de la page passe par les actions de `editorStore` (jamais de mutation directe des objets Konva). Chaque action crée une étape d'historique ; la sélection n'en crée pas. Le store garde toutes les pages du chapitre (`pages`, `currentPage`) : `pages[0]` est la couverture, `pages[n]` la page n ; `page` est la page affichée, celle que modifient les actions. Une étape d'historique contient toutes les pages (décision n° 12).
 - **Sauvegarde locale** : le chapitre est enregistré dans IndexedDB 1 s après chaque modification (`useLocalSave`). Le canvas n'apparaît qu'une fois la dernière page restaurée, pour qu'une page vide n'écrase jamais une sauvegarde. Pour repartir de zéro en dev : outils de développement du navigateur → Application → IndexedDB → supprimer `keyval-store`.
 - **Raccourcis clavier** : un nouveau raccourci s'ajoute à deux endroits de `src/lib/shortcuts.ts` : dans `matchShortcut` (ce qu'il fait) et dans `SHORTCUT_GROUPS` (la fenêtre « Raccourcis clavier », touche `?`). Un test vérifie que chaque raccourci affiché existe vraiment.
 - **Images** : compressées dans le navigateur (WebP, 2000 px max) puis stockées en dataURL dans le JSON de la page (phase 1, décision n° 9). Une image couvre toujours sa case : `clampCrop` corrige le recadrage après chaque déplacement, zoom ou redimensionnement.

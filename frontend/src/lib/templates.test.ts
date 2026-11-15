@@ -16,10 +16,17 @@ const expectedCounts: Record<TemplateId, number> = {
   "manga-classic": 4,
   action: 5,
   webtoon: 3,
+  cover: 1,
 };
 
 describe("templates", () => {
-  it("offers at least the 7 templates of the spec", () => {
+  it("makes the cover a borderless panel over the whole page (bleed)", () => {
+    const [panel] = getTemplate("cover").build(page);
+    expect(panel).toMatchObject({ x: 0, y: 0, w: page.width, h: page.height, rotation: 0 });
+    expect(panel.border.width).toBe(0);
+  });
+
+  it("offers the 7 templates of the spec, plus the cover", () => {
     expect(TEMPLATES.map((t) => t.id).sort()).toEqual(Object.keys(expectedCounts).sort());
   });
 
@@ -30,7 +37,8 @@ describe("templates", () => {
       expect(panels).toHaveLength(expectedCounts[template.id]);
     });
 
-    it("stays inside the page margins", () => {
+    it("stays inside the page margins (except the cover, which bleeds)", () => {
+      if (template.id === "cover") return;
       for (const p of panels) {
         const b = bbox(p);
         expect(b.left).toBeGreaterThanOrEqual(page.margin - 1);

@@ -16,6 +16,7 @@ import { ZoomControls } from "./ZoomControls";
 import { SaveIndicator } from "./SaveIndicator";
 import { ExportMenu } from "./ExportMenu";
 import { PageStrip } from "./PageStrip";
+import { ChapterOverview } from "./ChapterOverview";
 import { useLocalSave } from "./useLocalSave";
 
 function CanvasLoading() {
@@ -74,6 +75,7 @@ export function Editor() {
             <CropBar />
           </main>
           {ready && <PageStrip />}
+          {ready && <ChapterOverview />}
         </div>
         <Sidebar />
       </div>

@@ -54,7 +54,7 @@ export function createAutosave({
     const savedAt = now();
     onStatus("saving", {});
     running = storage
-      .save({ version: 2, savedAt, ...data })
+      .save({ version: 3, savedAt, ...data })
       .then(
         () => {
           if (!disposed) onStatus(dirty ? "pending" : "saved", { savedAt });

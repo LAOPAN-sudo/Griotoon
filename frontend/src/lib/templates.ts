@@ -12,7 +12,8 @@ export type TemplateId =
   | "grid-2x2"
   | "manga-classic"
   | "action"
-  | "webtoon";
+  | "webtoon"
+  | "cover";
 
 export interface Template {
   id: TemplateId;
@@ -164,6 +165,15 @@ export const TEMPLATES: Template[] = [
       ],
       (page) => page.gutter * 3,
     ),
+  },
+  {
+    id: "cover",
+    nameKey: "templates.cover",
+    // One borderless panel over the whole page (bleed): the cover illustration.
+    // The title goes on top as text (sound effect or bubble).
+    build: (page) => [
+      createPanel(page, { x: 0, y: 0, w: page.width, h: page.height, rotation: 0, border: { width: 0, color: "#000000" }, z: 0 }),
+    ],
   },
 ];
 

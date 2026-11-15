@@ -103,6 +103,10 @@ Le choix d'un gabarit remplace les cases existantes après confirmation (« Remp
 - Barre des pages : clic pour ouvrir, glisser ou Alt + ←/→ pour déplacer, boutons Dupliquer et Supprimer au survol (toujours visibles sur la page courante). Raccourcis Page préc. / Page suiv.
 - Miniatures et export dessinés par la même fonction (`renderPage.tsx`) : la page est rendue depuis son JSON dans un canvas caché, avec les composants de l'éditeur. Miniatures redessinées 0,4 s après la dernière modification, seulement pour la page qui a changé.
 - Export : PNG = page affichée ; PDF = tout le chapitre, une page A4 par planche, dessinées une à une pour limiter la mémoire.
+- Chapitre (ajout après l'étape 11, décision n° 13) : numéro et titre modifiables sur place (« Chapitre 1 · La route de Ouaga ») ; **couverture** éditée comme une page, toujours en premier, non numérotée, ni déplaçable, ni copiable, ni supprimable. Une nouvelle couverture reçoit le gabarit « Couverture » (une case sans bordure sur toute la page) et le texte « CHAPITRE 1 » (onomatopée blanche à contour, modifiable). Dans le store, `pages[0]` est la couverture et `pages[n]` la page n.
+- Barre du bas compacte : titre du chapitre, position (« Page 7 / 21 »), couverture puis miniatures numérotées, défilement automatique jusqu'à la page ouverte, molette = défilement horizontal.
+- **Vue d'ensemble** (bouton de la barre) : plein écran, couverture seule puis pages par doubles pages (1–2, 3–4…) comme dans le livre imprimé. Clic = ouvrir la page ; glisser = déplacer ; Dupliquer / Supprimer au survol ; Échap pour fermer.
+- Export : PDF = couverture puis pages, fichier nommé d'après le chapitre (`griotoon-chapitre-1-la-route-de-ouaga-AAAA-MM-JJ.pdf`) ; PNG = page affichée (`…-page-3-…`, `…-couverture-…`).
 
 ## Raccourcis clavier
 

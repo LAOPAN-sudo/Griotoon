@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { copyPage, createPageLike, insertAt, moveItem, removeAt } from "./chapter";
+import { copyPage, createChapter, createPageLike, insertAt, moveItem, removeAt, spreads } from "./chapter";
 import { createEmptyPage, createPanel } from "./page";
 
 describe("chapter helpers", () => {
@@ -28,5 +28,20 @@ describe("chapter helpers", () => {
     const next = createPageLike(page);
     expect(next).toMatchObject({ background: "#111111", margin: 30, gutter: 10, width: page.width, panels: [] });
     expect(next.id).not.toBe(page.id);
+  });
+
+  it("creates a chapter with a cover: full-page panel and the heading as text", () => {
+    const chapter = createChapter(undefined, { heading: "CHAPTER 1" });
+    expect(chapter).toMatchObject({ version: 1, number: 1, title: "" });
+    expect(chapter.pages).toHaveLength(1);
+    expect(chapter.cover.panels).toHaveLength(1);
+    expect(chapter.cover.sfx[0]).toMatchObject({ text: "CHAPTER 1", color: "#FFFFFF" });
+    expect(chapter.cover.id).not.toBe(chapter.pages[0].id);
+  });
+
+  it("groups pages two by two after the cover, as in the printed book", () => {
+    expect(spreads(1)).toEqual([[0], [1]]);
+    expect(spreads(4)).toEqual([[0], [1, 2], [3, 4]]);
+    expect(spreads(5)).toEqual([[0], [1, 2], [3, 4], [5]]);
   });
 });

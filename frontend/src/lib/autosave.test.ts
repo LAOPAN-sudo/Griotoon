@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createAutosave, type SaveStatus } from "./autosave";
+import { createChapter } from "./chapter";
 import { createEmptyPage } from "./page";
 import { memoryPageStorage, parseSavedPage, type PageStorage, type SavedPage } from "./pageStorage";
 import type { Page } from "@/types/page";
@@ -10,7 +11,7 @@ function setup(storage: PageStorage = memoryPageStorage()) {
   const statuses: SaveStatus[] = [];
   const autosave = createAutosave({
     storage,
-    getData: () => ({ chapter: { version: 1, pages: [page] }, currentPage: 0 }),
+    getData: () => ({ chapter: { ...createChapter([page]), pages: [page] }, currentPage: 1 }),
     subscribe: (l) => {
       listeners.add(l);
       return () => listeners.delete(l);
@@ -109,23 +110,31 @@ describe("autosave", () => {
 describe("parseSavedPage", () => {
   const record = (page: unknown) => ({ version: 1, savedAt: 1, page });
 
-  it("accepts a saved chapter and keeps the page being edited", () => {
-    const pages = [createEmptyPage(), createEmptyPage()];
-    const saved = parseSavedPage({ version: 2, savedAt: 5, chapter: { version: 1, pages }, currentPage: 1 });
-    expect(saved?.chapter.pages).toEqual(pages);
-    expect(saved?.currentPage).toBe(1);
-    // An out-of-range page index is clamped.
-    expect(parseSavedPage({ version: 2, savedAt: 5, chapter: { version: 1, pages }, currentPage: 9 })?.currentPage).toBe(1);
+  it("accepts a saved chapter with its cover, number, title and page being edited", () => {
+    const chapter = { ...createChapter([createEmptyPage(), createEmptyPage()]), number: 4, title: "Le marché" };
+    const saved = parseSavedPage({ version: 3, savedAt: 5, chapter, currentPage: 2 });
+    expect(saved?.chapter).toEqual(chapter);
+    expect(saved?.currentPage).toBe(2);
+    // An out-of-range page index is clamped (0 = cover … 2 = last page).
+    expect(parseSavedPage({ version: 3, savedAt: 5, chapter, currentPage: 9 })?.currentPage).toBe(2);
+    expect(parseSavedPage({ version: 3, savedAt: 5, chapter: { ...chapter, cover: null }, currentPage: 0 })).toBeNull();
   });
 
-  it("turns a one-page save from step 9 into a chapter, giving the page an id", () => {
+  it("gives older saves a cover: one page (step 9) or pages without cover (step 11)", () => {
     const { id: _id, ...oldPage } = createEmptyPage();
     void _id;
-    const saved = parseSavedPage(record(oldPage));
-    expect(saved?.version).toBe(2);
-    expect(saved?.chapter.pages).toHaveLength(1);
-    expect(saved?.chapter.pages[0].id).toEqual(expect.any(String));
-    expect(saved?.chapter.pages[0].margin).toBe(oldPage.margin);
+    const fromOne = parseSavedPage(record(oldPage), "CHAPTER 1");
+    expect(fromOne?.version).toBe(3);
+    expect(fromOne?.chapter.pages).toHaveLength(1);
+    expect(fromOne?.chapter.pages[0].id).toEqual(expect.any(String));
+    expect(fromOne?.chapter.cover.sfx[0].text).toBe("CHAPTER 1");
+    expect(fromOne?.currentPage).toBe(1);
+
+    const pages = [createEmptyPage(), createEmptyPage()];
+    const fromTwo = parseSavedPage({ version: 2, savedAt: 1, chapter: { version: 1, pages }, currentPage: 1 });
+    expect(fromTwo?.chapter.pages).toEqual(pages);
+    expect(fromTwo?.chapter.cover.panels).toHaveLength(1);
+    expect(fromTwo?.currentPage).toBe(2); // the same page, now after the cover
   });
 
   it("rejects missing or damaged data", () => {

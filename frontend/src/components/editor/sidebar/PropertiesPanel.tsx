@@ -142,7 +142,7 @@ function PageProperties({ t }: { t: T }) {
 function ResetPageButton({ t }: { t: T }) {
   const [confirming, setConfirming] = useState(false);
   const empty = useEditorStore((s) => s.page.panels.length + s.page.bubbles.length + s.page.sfx.length === 0);
-  const pageNumber = useEditorStore((s) => s.currentPage + 1);
+  const pageIndex = useEditorStore((s) => s.currentPage);
   return (
     <>
       <button
@@ -156,7 +156,7 @@ function ResetPageButton({ t }: { t: T }) {
       </button>
       <ConfirmDialog
         open={confirming}
-        title={t("properties.resetPageTitle", { n: pageNumber })}
+        title={pageIndex === 0 ? t("properties.resetCoverTitle") : t("properties.resetPageTitle", { n: pageIndex })}
         message={t("properties.resetPageMessage")}
         confirmLabel={t("properties.resetPageConfirm")}
         cancelLabel={t("common.cancel")}

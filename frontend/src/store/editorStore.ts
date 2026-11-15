@@ -4,7 +4,7 @@ import { nanoid } from "nanoid";
 import type { Bubble, BubbleType, Chapter, Page, PageElement, Panel, PanelImage, Sfx } from "@/types/page";
 import { copyPage, createChapter, createPageLike, insertAt, moveItem, removeAt } from "@/lib/chapter";
 import { defaultTail } from "@/lib/bubbles";
-import { allElements, createBubble, createEmptyPage, createPanel, createSfx, nextZ } from "@/lib/page";
+import { allElements, createBubble, createPanel, createSfx, nextZ } from "@/lib/page";
 
 export const HISTORY_LIMIT = 100;
 /** Consecutive changes with the same merge key within this delay form one undo step. */
@@ -41,10 +41,15 @@ export interface Snapshot {
 }
 
 export interface EditorState {
-  /** Pages of the chapter, in reading order. */
+  /**
+   * Cover then story pages, in reading order: `pages[0]` is the cover, which
+   * cannot be moved, copied or deleted; `pages[n]` is page n.
+   */
   pages: Page[];
-  /** Index of the page being edited. */
+  /** Index of the page being edited (0 = cover). */
   currentPage: number;
+  chapterNumber: number;
+  chapterTitle: string;
   /** The page being edited: always `pages[currentPage]` (kept as a field for simple selectors). */
   page: Page;
   selectedIds: string[];
@@ -59,22 +64,24 @@ export interface EditorState {
   /** Undone snapshots, most recently undone last. */
   future: Snapshot[];
 
-  /** Replace the chapter (e.g. restore from storage). Clears history and selection. */
+  /** Replace the chapter (e.g. restore from storage). `currentPage` counts the cover as 0. Clears history and selection. */
   loadChapter: (chapter: Chapter, currentPage?: number) => void;
-  /** Replace everything with a one-page chapter. */
+  /** Replace everything with a chapter holding this page (and a new cover); shows the page. */
   loadPage: (page: Page) => void;
+  /** Chapter number and title (not undo steps: edited like a document name). */
+  updateChapterInfo: (info: { number?: number; title?: string }) => void;
   /** The chapter as saved and exported. */
   getChapter: () => Chapter;
 
   /** Show another page (not an undo step). */
   goToPage: (index: number) => void;
-  /** Add an empty page (same format and settings) after the current one and show it. */
+  /** Add an empty page (same format and settings) after the current one (page 1 from the cover) and show it. */
   addPage: () => void;
-  /** Copy a page (the current one by default) right after it and show the copy. */
+  /** Copy a page (the current one by default) right after it and show the copy. Not the cover. */
   duplicatePage: (index?: number) => void;
-  /** Delete a page. The last remaining page cannot be deleted. */
+  /** Delete a page. Neither the cover nor the last story page can be deleted. */
   removePage: (index: number) => void;
-  /** Move a page to another position; the page being edited stays the same. */
+  /** Move a story page to another position (never before the cover); the page being edited stays the same. */
   movePage: (from: number, to: number) => void;
   /** Remove every element of the current page (panels, images, bubbles, sfx); its settings stay. */
   resetPage: () => void;
@@ -202,11 +209,13 @@ export const editorStateCreator: StateCreator<EditorState> = (set, get) => {
     d.bubbles.find((b) => b.id === id) ??
     d.sfx.find((s) => s.id === id);
 
-  const firstPage = createEmptyPage();
+  const initial = createChapter();
   return {
-    pages: [firstPage],
-    currentPage: 0,
-    page: firstPage,
+    pages: [initial.cover, ...initial.pages],
+    currentPage: 1,
+    page: initial.pages[0],
+    chapterNumber: initial.number,
+    chapterTitle: initial.title,
     selectedIds: [],
     tool: "select",
     crop: null,
@@ -215,16 +224,38 @@ export const editorStateCreator: StateCreator<EditorState> = (set, get) => {
     past: [],
     future: [],
 
-    loadChapter: (chapter, currentPage = 0) => {
+    loadChapter: (chapter, currentPage = 1) => {
       lastMerge = null;
-      const pages = chapter.pages.length > 0 ? chapter.pages : [createEmptyPage()];
+      const story = chapter.pages.length > 0 ? chapter.pages : [createPageLike(chapter.cover)];
+      const pages = [chapter.cover, ...story];
       const index = Math.max(0, Math.min(pages.length - 1, currentPage));
-      set({ pages, currentPage: index, page: pages[index], selectedIds: [], past: [], future: [], crop: null, editingId: null });
+      set({
+        pages,
+        currentPage: index,
+        page: pages[index],
+        chapterNumber: chapter.number,
+        chapterTitle: chapter.title,
+        selectedIds: [],
+        past: [],
+        future: [],
+        crop: null,
+        editingId: null,
+      });
     },
 
-    loadPage: (page) => get().loadChapter(createChapter([page])),
+    loadPage: (page) => get().loadChapter(createChapter([page]), 1),
 
-    getChapter: () => createChapter(get().pages),
+    updateChapterInfo: ({ number, title }) => {
+      const patch: Partial<EditorState> = {};
+      if (number !== undefined && Number.isFinite(number) && number >= 0) patch.chapterNumber = Math.round(number);
+      if (title !== undefined) patch.chapterTitle = title.trim();
+      set(patch);
+    },
+
+    getChapter: () => {
+      const { pages, chapterNumber, chapterTitle } = get();
+      return { version: 1, number: chapterNumber, title: chapterTitle, cover: pages[0], pages: pages.slice(1) };
+    },
 
     goToPage: (index) => {
       const { pages, currentPage } = get();
@@ -239,21 +270,22 @@ export const editorStateCreator: StateCreator<EditorState> = (set, get) => {
     addPage: () => {
       get().endCrop();
       const { pages, currentPage, page } = get();
-      commitPages(insertAt(pages, currentPage + 1, createPageLike(page)), currentPage + 1);
+      const at = Math.max(1, currentPage + 1);
+      commitPages(insertAt(pages, at, createPageLike(page)), at);
     },
 
     duplicatePage: (index) => {
       get().endCrop();
       const { pages, currentPage } = get();
       const i = index ?? currentPage;
-      if (!pages[i]) return;
+      if (i < 1 || !pages[i]) return;
       commitPages(insertAt(pages, i + 1, copyPage(pages[i])), i + 1);
     },
 
     removePage: (index) => {
       get().endCrop();
       const { pages, currentPage } = get();
-      if (pages.length <= 1 || !pages[index]) return;
+      if (index < 1 || pages.length <= 2 || !pages[index]) return;
       const next = removeAt(pages, index);
       // Keep showing the same page; if it was the deleted one, show its neighbour.
       const current = index < currentPage ? currentPage - 1 : Math.min(currentPage, next.length - 1);
@@ -263,7 +295,8 @@ export const editorStateCreator: StateCreator<EditorState> = (set, get) => {
     movePage: (from, to) => {
       get().endCrop();
       const { pages, page } = get();
-      const next = moveItem(pages, from, to);
+      if (from < 1) return;
+      const next = moveItem(pages, from, Math.max(1, to));
       if (next === pages) return;
       commitPages(next, next.findIndex((p) => p.id === page.id));
     },

@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { createAutosave } from "@/lib/autosave";
+import { createChapter } from "@/lib/chapter";
+import { translate, useLocaleStore } from "@/i18n";
 import { idbPageStorage, parseSavedPage, type PageStorage } from "@/lib/pageStorage";
 import { useEditorStore } from "@/store/editorStore";
 import { useUiStore } from "@/store/uiStore";
@@ -24,9 +26,11 @@ export function useLocalSave(storage: PageStorage = idbPageStorage): boolean {
     const ui = useUiStore.getState();
 
     const start = async () => {
+      // Title text of a new cover, in the interface language (it is page content, editable).
+      const heading = translate(useLocaleStore.getState().locale, "chapter.coverHeading", { n: 1 });
       let saved = null;
       try {
-        saved = parseSavedPage(await storage.load());
+        saved = parseSavedPage(await storage.load(), heading);
       } catch {
         // IndexedDB unavailable (some private windows): edit anyway, saving will report the error.
       }
@@ -35,6 +39,9 @@ export function useLocalSave(storage: PageStorage = idbPageStorage): boolean {
       if (saved) {
         useEditorStore.getState().loadChapter(saved.chapter, saved.currentPage);
         ui.setSaveStatus("saved", saved.savedAt);
+      } else {
+        // First visit: a new chapter whose cover heading is in the interface language.
+        useEditorStore.getState().loadChapter(createChapter(undefined, { heading }), 1);
       }
 
       let errorShown = false;
@@ -44,9 +51,16 @@ export function useLocalSave(storage: PageStorage = idbPageStorage): boolean {
           const { getChapter, currentPage } = useEditorStore.getState();
           return { chapter: getChapter(), currentPage };
         },
-        // Any change to the pages, or another page shown (reopened on that page next time).
+        // Any change to the pages or the chapter name, or another page shown (reopened there next time).
         subscribe: (listener) =>
-          useEditorStore.subscribe((s, prev) => (s.pages !== prev.pages || s.currentPage !== prev.currentPage) && listener()),
+          useEditorStore.subscribe(
+            (s, prev) =>
+              (s.pages !== prev.pages ||
+                s.currentPage !== prev.currentPage ||
+                s.chapterNumber !== prev.chapterNumber ||
+                s.chapterTitle !== prev.chapterTitle) &&
+              listener(),
+          ),
         onStatus: (status, { savedAt, error }) => {
           useUiStore.getState().setSaveStatus(status, savedAt);
           if (status === "saved") errorShown = false;

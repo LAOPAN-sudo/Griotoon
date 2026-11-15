@@ -5,6 +5,7 @@ import { useT } from "@/i18n";
 import type { ExportFormat } from "@/lib/exportPage";
 import { useEditorStore } from "@/store/editorStore";
 import { useUiStore } from "@/store/uiStore";
+import { pageName } from "./pages/shared";
 
 const nextFrame = () => new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
 
@@ -14,7 +15,7 @@ export function ExportMenu() {
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
-  const pageCount = useEditorStore((s) => s.pages.length);
+  const storyCount = useEditorStore((s) => s.pages.length - 1);
   const currentPage = useEditorStore((s) => s.currentPage);
 
   // Close on a click outside or on Escape.
@@ -49,11 +50,13 @@ export function ExportMenu() {
       await nextFrame();
       // Loaded on demand: the export code and jsPDF stay out of the first load.
       const { exportChapterPdf, exportPagePng } = await import("./exportCanvas");
-      const { page, pages } = useEditorStore.getState();
+      const { page, pages, currentPage: index, chapterNumber, chapterTitle } = useEditorStore.getState();
+      // "chapitre-1-la-route-de-ouaga"; PNG files also name the page ("…-page-3", "…-couverture").
+      const chapterName = [t("chapter.label"), chapterNumber, chapterTitle].filter((x) => x !== "").join(" ");
       if (format === "png") {
-        await exportPagePng(page, t("export.fileBase"));
+        await exportPagePng(page, `${chapterName} ${pageName(t, index)}`);
       } else {
-        await exportChapterPdf(pages, t("export.fileBase"), (n) => {
+        await exportChapterPdf(pages, chapterName, (n) => {
           if (pages.length > 1) useUiStore.getState().notify("info", "export.workingPage", { n, total: pages.length });
         });
       }
@@ -67,8 +70,8 @@ export function ExportMenu() {
   };
 
   const items: { format: ExportFormat; label: string; help: string }[] = [
-    { format: "png", label: t("export.png"), help: t("export.pngHelp", { n: currentPage + 1 }) },
-    { format: "pdf", label: t("export.pdf"), help: t("export.pdfHelp", { count: pageCount }) },
+    { format: "png", label: t("export.png"), help: t("export.pngHelp", { name: pageName(t, currentPage) }) },
+    { format: "pdf", label: t("export.pdf"), help: t("export.pdfHelp", { count: storyCount }) },
   ];
 
   return (

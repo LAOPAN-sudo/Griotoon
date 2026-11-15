@@ -27,9 +27,10 @@ describe("export menu", () => {
     render(<ExportMenu />);
     fireEvent.click(screen.getByRole("button", { name: "Exporter" }));
     expect(screen.getByRole("menu", { name: "Exporter la planche" })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("menuitem", { name: /Document PDF.*Tout le chapitre \(2 p\.\)/ }));
+    fireEvent.click(screen.getByRole("menuitem", { name: /Document PDF.*couverture \+ 2 p\./ }));
     await waitFor(() => expect(exportChapterPdf).toHaveBeenCalledTimes(1));
-    expect(exportChapterPdf).toHaveBeenCalledWith(useEditorStore.getState().pages, "planche", expect.any(Function));
+    // Cover first, then the pages; the file is named after the chapter.
+    expect(exportChapterPdf).toHaveBeenCalledWith(useEditorStore.getState().pages, "Chapitre 1", expect.any(Function));
     expect(screen.queryByRole("menu")).toBeNull();
     await waitFor(() => expect(useUiStore.getState().notice).toBeNull());
   });
@@ -40,7 +41,7 @@ describe("export menu", () => {
     render(<ExportMenu />);
     fireEvent.click(screen.getByRole("button", { name: "Exporter" }));
     fireEvent.click(screen.getByRole("menuitem", { name: /Image PNG/ }));
-    await waitFor(() => expect(exportPagePng).toHaveBeenCalledWith(useEditorStore.getState().page, "planche"));
+    await waitFor(() => expect(exportPagePng).toHaveBeenCalledWith(useEditorStore.getState().page, "Chapitre 1 Page 1"));
     expect(useEditorStore.getState().editingId).toBeNull();
   });
 

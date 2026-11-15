@@ -5,6 +5,7 @@
 
 import { del, get, set } from "idb-keyval";
 import { nanoid } from "nanoid";
+import { createChapter } from "./chapter";
 import type { Chapter, Page } from "@/types/page";
 
 /** Where the page is kept. An interface, so tests can use memory instead of IndexedDB. */
@@ -15,12 +16,12 @@ export interface PageStorage {
 }
 
 /**
- * What is written: the chapter, the page being edited and the time of the
- * save. Version 1 (step 9) held a single page; it is still read (see
- * parseSavedPage) so nothing is lost.
+ * What is written: the chapter, the page being edited (0 = cover) and the
+ * time of the save. Older versions are still read (see parseSavedPage) so
+ * nothing is lost: 1 = a single page (step 9), 2 = pages without cover.
  */
 export interface SavedPage {
-  version: 2;
+  version: 3;
   savedAt: number;
   chapter: Chapter;
   currentPage: number;
@@ -72,19 +73,37 @@ const withId = (page: Page): Page => (typeof page.id === "string" && page.id ? p
  * Check a saved record before restoring it. Returns null for anything that
  * does not look like a chapter (nothing saved, another format, corrupted
  * data), so the editor starts on an empty page instead of crashing.
- * A version 1 record (one page) becomes a one-page chapter.
+ * Older records get a new cover, with `heading` as its title text.
  */
-export function parseSavedPage(data: unknown): SavedPage | null {
+export function parseSavedPage(data: unknown, heading = "CHAPITRE 1"): SavedPage | null {
   if (!isObject(data) || !isNumber(data.savedAt)) return null;
+  const savedAt = data.savedAt;
+  const clampIndex = (index: unknown, count: number) =>
+    isNumber(index) ? Math.max(0, Math.min(count, Math.round(index))) : 1;
 
   if (data.version === 1) {
     if (!isPage(data.page)) return null;
-    return { version: 2, savedAt: data.savedAt, chapter: { version: 1, pages: [withId(data.page)] }, currentPage: 0 };
+    return { version: 3, savedAt, chapter: createChapter([withId(data.page)], { heading }), currentPage: 1 };
   }
 
-  if (data.version !== 2 || !isObject(data.chapter) || data.chapter.version !== 1) return null;
+  if (!isObject(data.chapter) || data.chapter.version !== 1) return null;
   const pages = data.chapter.pages;
   if (!Array.isArray(pages) || pages.length === 0 || !pages.every(isPage)) return null;
-  const currentPage = isNumber(data.currentPage) ? Math.max(0, Math.min(pages.length - 1, Math.round(data.currentPage))) : 0;
-  return { version: 2, savedAt: data.savedAt, chapter: { version: 1, pages: pages.map(withId) }, currentPage };
+
+  if (data.version === 2) {
+    // Same pages, now after a new cover: indexes shift by one.
+    const chapter = createChapter(pages.map(withId), { heading });
+    const current = isNumber(data.currentPage) ? data.currentPage + 1 : 1;
+    return { version: 3, savedAt, chapter, currentPage: clampIndex(current, pages.length) };
+  }
+
+  if (data.version !== 3) return null;
+  const { number, title, cover } = data.chapter;
+  if (!isNumber(number) || typeof title !== "string" || !isPage(cover)) return null;
+  return {
+    version: 3,
+    savedAt,
+    chapter: { version: 1, number, title, cover: withId(cover), pages: pages.map(withId) },
+    currentPage: clampIndex(data.currentPage, pages.length),
+  };
 }

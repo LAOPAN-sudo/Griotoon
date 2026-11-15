@@ -34,6 +34,7 @@ CREATE TABLE chapters (
   project_id UUID REFERENCES projects(id) ON DELETE CASCADE,
   number INT NOT NULL,
   title TEXT,
+  cover JSONB,                 -- couverture : document Page (format ci-dessous)
   script TEXT,                 -- l'histoire écrite par l'utilisateur
   breakdown JSONB,             -- découpage proposé par le LLM (voir 07-pipeline-ia.md)
   UNIQUE (project_id, number)
@@ -173,7 +174,10 @@ export interface Page {
 }
 export interface Chapter {
   version: 1;
-  pages: Page[];   // dans l'ordre de lecture
+  number: number;  // « Chapitre 1 »
+  title: string;   // « La route de Ouaga » (vide = sans titre)
+  cover: Page;     // couverture : éditée comme une page, toujours en premier, non numérotée
+  pages: Page[];   // pages de l'histoire dans l'ordre de lecture (page 1, 2…), jamais vide
 }
 ```
 
@@ -183,9 +187,9 @@ Tant qu'il n'y a pas de backend, le chapitre est enregistré dans le navigateur 
 
 ```jsonc
 {
-  "version": 2,              // la version 1 (étape 9) contenait une seule page ; elle est convertie à la lecture
+  "version": 3,              // anciennes versions converties à la lecture : 1 = une seule page, 2 = pages sans couverture
   "savedAt": 1763140000000,  // date de l'enregistrement (ms)
-  "chapter": { "version": 1, "pages": [ /* Page… */ ] },
-  "currentPage": 0           // page rouverte au prochain chargement
+  "chapter": { "version": 1, "number": 1, "title": "La route de Ouaga", "cover": { /* Page */ }, "pages": [ /* Page… */ ] },
+  "currentPage": 1           // page rouverte au prochain chargement (0 = couverture)
 }
 ```

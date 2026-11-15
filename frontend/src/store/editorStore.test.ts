@@ -8,6 +8,7 @@ import {
   type EditorState,
 } from "./editorStore";
 import { createEmptyPage, createPanel } from "@/lib/page";
+import { createChapter } from "@/lib/chapter";
 
 let store: StoreApi<EditorState>;
 const s = () => store.getState();
@@ -442,77 +443,96 @@ describe("page settings and hidden elements", () => {
 });
 
 describe("pages of the chapter", () => {
+  // pages[0] is the cover, pages[n] is page n.
   const ids = () => s().pages.map((p) => p.id);
 
-  it("starts with one page, which is the page being edited", () => {
-    expect(s().pages).toHaveLength(1);
-    expect(s().page).toBe(s().pages[0]);
+  it("starts with a cover and page 1, editing page 1", () => {
+    expect(s().pages).toHaveLength(2);
+    expect(s().currentPage).toBe(1);
+    expect(s().page).toBe(s().pages[1]);
+    expect(s().pages[0].panels).toHaveLength(1); // cover template
+    expect(s().chapterNumber).toBe(1);
   });
 
   it("edits only the current page", () => {
     s().addPage();
     s().addPanel();
-    expect(s().currentPage).toBe(1);
-    expect(s().pages[1].panels).toHaveLength(1);
-    expect(s().pages[0].panels).toHaveLength(0);
-    expect(s().page).toBe(s().pages[1]);
+    expect(s().currentPage).toBe(2);
+    expect(s().pages[2].panels).toHaveLength(1);
+    expect(s().pages[1].panels).toHaveLength(0);
+    expect(s().page).toBe(s().pages[2]);
   });
 
   it("adds an empty page after the current one, with the same settings", () => {
     s().updatePage({ background: "#FFF8E7", margin: 80 });
     s().addPanel();
     s().addPage();
-    expect(s().pages).toHaveLength(2);
+    expect(s().pages).toHaveLength(3);
     expect(s().page).toMatchObject({ background: "#FFF8E7", margin: 80, panels: [] });
-    expect(s().page.id).not.toBe(s().pages[0].id);
+    expect(s().page.id).not.toBe(s().pages[1].id);
   });
 
-  it("duplicates a page right after it and shows the copy", () => {
+  it("adds page 1 when the cover is shown", () => {
+    const first = s().pages[1].id;
+    s().goToPage(0);
+    s().addPage();
+    expect(s().currentPage).toBe(1);
+    expect(s().pages[2].id).toBe(first);
+  });
+
+  it("duplicates a page right after it and shows the copy, never the cover", () => {
     s().addPanel();
     s().addPage();
-    s().goToPage(0);
+    s().goToPage(1);
     s().duplicatePage();
-    expect(s().pages).toHaveLength(3);
-    expect(s().currentPage).toBe(1);
-    expect(s().page.panels).toEqual(s().pages[0].panels);
-    expect(new Set(ids()).size).toBe(3);
+    expect(s().pages).toHaveLength(4);
+    expect(s().currentPage).toBe(2);
+    expect(s().page.panels).toEqual(s().pages[1].panels);
+    expect(new Set(ids()).size).toBe(4);
     // Editing the copy leaves the original untouched.
     s().addPanel();
-    expect(s().pages[0].panels).toHaveLength(1);
-    expect(s().pages[1].panels).toHaveLength(2);
+    expect(s().pages[1].panels).toHaveLength(1);
+    expect(s().pages[2].panels).toHaveLength(2);
+    s().duplicatePage(0);
+    expect(s().pages).toHaveLength(4);
   });
 
-  it("deletes a page but never the last one", () => {
+  it("deletes a page but never the cover nor the last page", () => {
+    s().removePage(1);
     s().removePage(0);
-    expect(s().pages).toHaveLength(1);
+    expect(s().pages).toHaveLength(2);
     s().addPage();
-    s().addPage(); // pages: 0, 1, 2 — showing 2
-    const [a, b, c] = ids();
-    s().removePage(0);
-    expect(ids()).toEqual([b, c]);
+    s().addPage(); // cover, 1, 2, 3 — showing 3
+    const [cover, a, b, c] = ids();
+    s().removePage(1);
+    expect(ids()).toEqual([cover, b, c]);
     expect(s().page.id).toBe(c); // still the same page
-    s().removePage(1); // the page being edited: its neighbour is shown
-    expect(ids()).toEqual([b]);
-    expect(s().currentPage).toBe(0);
+    s().removePage(2); // the page being edited: its neighbour is shown
+    expect(ids()).toEqual([cover, b]);
+    expect(s().currentPage).toBe(1);
     void a;
   });
 
-  it("moves a page and keeps editing the same one", () => {
+  it("moves a page and keeps editing the same one; nothing goes before the cover", () => {
     s().addPage();
     s().addPage();
-    const [a, b, c] = ids();
-    s().goToPage(0);
-    s().movePage(0, 2);
-    expect(ids()).toEqual([b, c, a]);
-    expect(s().currentPage).toBe(2);
+    const [cover, a, b, c] = ids();
+    s().goToPage(1);
+    s().movePage(1, 3);
+    expect(ids()).toEqual([cover, b, c, a]);
+    expect(s().currentPage).toBe(3);
     expect(s().page.id).toBe(a);
+    s().movePage(3, 0);
+    expect(ids()).toEqual([cover, a, b, c]);
+    s().movePage(0, 2);
+    expect(ids()).toEqual([cover, a, b, c]);
   });
 
   it("changing page clears the selection and is not an undo step", () => {
     s().addPage();
     const steps = s().past.length;
     s().select(s().addPanel());
-    s().goToPage(0);
+    s().goToPage(1);
     expect(s().selectedIds).toEqual([]);
     expect(s().past.length).toBe(steps + 1); // only the panel
   });
@@ -521,18 +541,18 @@ describe("pages of the chapter", () => {
     s().addPanel(); // on page 1
     s().addPage();
     s().addPage();
+    expect(s().pages).toHaveLength(4);
+    s().removePage(1);
     expect(s().pages).toHaveLength(3);
-    s().removePage(0);
-    expect(s().pages).toHaveLength(2);
     s().undo();
-    expect(s().pages).toHaveLength(3);
-    expect(s().pages[0].panels).toHaveLength(1);
+    expect(s().pages).toHaveLength(4);
+    expect(s().pages[1].panels).toHaveLength(1);
     // Undo an edit on page 1 while page 3 is shown: page 1 comes back on screen.
-    s().goToPage(0);
+    s().goToPage(1);
     s().addSfx();
-    s().goToPage(2);
+    s().goToPage(3);
     s().undo();
-    expect(s().currentPage).toBe(0);
+    expect(s().currentPage).toBe(1);
     expect(s().page.sfx).toHaveLength(0);
     s().redo();
     expect(s().page.sfx).toHaveLength(1);
@@ -542,14 +562,14 @@ describe("pages of the chapter", () => {
     s().addPage();
     const added = s().page.id;
     s().undo();
-    expect(s().pages).toHaveLength(1);
-    expect(s().currentPage).toBe(0);
+    expect(s().pages).toHaveLength(2);
+    expect(s().currentPage).toBe(1);
     s().redo();
     expect(s().page.id).toBe(added);
-    expect(s().currentPage).toBe(1);
+    expect(s().currentPage).toBe(2);
     s().undo();
     s().redo();
-    expect(s().currentPage).toBe(1);
+    expect(s().currentPage).toBe(2);
   });
 
   it("ends a crop session before changing page", () => {
@@ -560,16 +580,23 @@ describe("pages of the chapter", () => {
     s().updateCrop({ src: "data:x", width: 100, height: 100, offsetX: -10, offsetY: 0, scale: 2 });
     s().addPage();
     expect(s().crop).toBeNull();
-    expect(s().pages[0].panels[0].image?.offsetX).toBe(-10);
+    expect(s().pages[1].panels[0].image?.offsetX).toBe(-10);
   });
 
   it("loads a chapter and returns it for saving", () => {
-    const pages = [createEmptyPage(), createEmptyPage()];
+    const chapter = { ...createChapter([createEmptyPage(), createEmptyPage()]), number: 3, title: "Le marché" };
     s().addPanel();
-    s().loadChapter({ version: 1, pages }, 1);
-    expect(s().page).toBe(pages[1]);
+    s().loadChapter(chapter, 2);
+    expect(s().page).toBe(chapter.pages[1]);
     expect(s().past).toEqual([]);
-    expect(s().getChapter()).toEqual({ version: 1, pages });
+    expect(s().getChapter()).toEqual(chapter);
+  });
+
+  it("changes the chapter number and title", () => {
+    s().updateChapterInfo({ number: 7, title: "  La route de Ouaga " });
+    expect(s().getChapter()).toMatchObject({ number: 7, title: "La route de Ouaga" });
+    s().updateChapterInfo({ number: -1 });
+    expect(s().chapterNumber).toBe(7);
   });
 });
 
@@ -582,7 +609,7 @@ describe("reset page", () => {
     const steps = s().past.length;
     s().resetPage();
     expect(s().page).toMatchObject({ panels: [], bubbles: [], sfx: [], background: "#111111", margin: 90 });
-    expect(s().pages[0].panels).toHaveLength(1);
+    expect(s().pages[1].panels).toHaveLength(1);
     expect(s().selectedIds).toEqual([]);
     expect(s().past.length).toBe(steps + 1);
     s().undo();
